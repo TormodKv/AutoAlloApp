@@ -10,11 +10,14 @@ namespace AutoAlloApp
 
         private static string MAPLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Map.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string EXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Export.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
-        private static string RESULTLOCATION = (AppDomain.CurrentDomain.BaseDirectory).Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
+        private static string RESULTLOCATION = AppDomain.CurrentDomain.BaseDirectory.Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
 
         static string[,] matrix;
         static Dictionary<string, Point> buildingLocations;
         static List<Reservation> reservations;
+
+        //Key: Spot name. Value: Building affiliation
+        static Dictionary<string, string> spots;
         
         static void Main(string[] args)
         {
@@ -44,7 +47,7 @@ namespace AutoAlloApp
                     if (cell.Contains("X "))
                         buildingLocations.Add(cell, new Point(x, y));
 
-
+                    if (cell.)
                 }
             }
 
