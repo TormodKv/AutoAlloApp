@@ -6,9 +6,10 @@ namespace AutoAlloApp
 {
     static class Program
     {
-        private const string MAPLOCATION =   @"C:\Users\tormod.kvitberg\Documents\GitHub\AutoAlloApp\Map.csv";
-        private const string EXPORTLOCATION = @"C:\Users\tormod.kvitberg\Documents\GitHub\AutoAlloApp\Export.csv";
-        private static string resultLocation = @"C:\Users\tormod.kvitberg\Documents\GitHub\AutoAlloApp\";
+
+        private static string MAPLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Map.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
+        private static string EXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Export.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
+        private static string RESULTLOCATION = (AppDomain.CurrentDomain.BaseDirectory).Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
 
         static string[,] matrix;
         static Dictionary<string, Point> buildingLocations;
