@@ -7,7 +7,6 @@ using System.Linq;
 namespace AutoAlloApp
 {
 
-
     static class Program
     {
 
@@ -15,7 +14,7 @@ namespace AutoAlloApp
         private static string EXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Export.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string RESULTLOCATION = AppDomain.CurrentDomain.BaseDirectory.Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
 
-        static string[,] matrix;
+        public static string[,] matrix;
 
         static List<Reservation> reservations;
         static List<Building> buildings;
@@ -72,9 +71,12 @@ namespace AutoAlloApp
 
             //While there exists reservations with no allocated parking spot
             while (reservations.Any(x => x.ParkingSpot.Length < 1)) {
-                
+                break;
             }
 
+            foreach (Building b in buildings) {
+                Console.WriteLine(b.Name + " = " + b.FindWalkDistance("C 008") + " Steps");
+            }
         }
 
         /// <summary>
