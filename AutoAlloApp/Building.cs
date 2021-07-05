@@ -67,16 +67,12 @@ namespace AutoAlloApp
         /// <returns></returns>
         private int Search(Point currentPos, Point lastPos, string goal, int stepsTaken) {
 
-            (string, Point) right = (matrix[currentPos.X + 1, currentPos.Y], new Point(currentPos.X + 1, currentPos.Y));
-            (string, Point) left = (matrix[currentPos.X - 1, currentPos.Y], new Point(currentPos.X - 1, currentPos.Y));
-            (string, Point) up = (matrix[currentPos.X, currentPos.Y + 1], new Point(currentPos.X, currentPos.Y+1));
-            (string, Point) down = (matrix[currentPos.X, currentPos.Y- 1], new Point(currentPos.X, currentPos.Y-1));
-
-            List<(string, Point)> directions = new();
-            directions.Add(right);
-            directions.Add(left);
-            directions.Add(up);
-            directions.Add(down);
+            (string, Point)[] directions = new (string, Point)[4] {
+            (matrix[currentPos.X + 1, currentPos.Y], new Point(currentPos.X + 1, currentPos.Y)),
+            (matrix[currentPos.X - 1, currentPos.Y], new Point(currentPos.X - 1, currentPos.Y)),
+            (matrix[currentPos.X, currentPos.Y + 1], new Point(currentPos.X, currentPos.Y + 1)),
+            (matrix[currentPos.X, currentPos.Y - 1], new Point(currentPos.X, currentPos.Y - 1))
+            };
 
             if (directions.Any(x => x.Item1 == goal)) {
                 return stepsTaken + 1;
