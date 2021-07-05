@@ -25,6 +25,18 @@ namespace AutoAlloApp
         }
 
         /// <summary>
+        /// Badness scroe. The higher, the worse the placements of the parking spots are (predicted)
+        /// Change the scale variable for different weighted results
+        /// </summary>
+        public float Badness
+        {
+            get {
+                float scale = 1f;
+                return AvgWalkDistance + (((1 - PercentageAllocated) * 100) * scale);
+            }
+        }
+
+        /// <summary>
         /// Returns the percentage (0 - 1) of spots that have been allocated
         /// </summary>
         public float PercentageAllocated {
@@ -48,13 +60,24 @@ namespace AutoAlloApp
 
         private string[,] matrix { get => Program.matrix; }
 
+        public void AquireNearestSpot(Dictionary<string, string> spotDict) {
+            string spot = FindNearest(spotDict);
+            spots.Add(spot);
+            spotDict[spot] = Name;
+        }
+
+        private string FindNearest(Dictionary<string, string> spotDict)
+        {
+            throw new NotImplementedException();
+        }
+
         /// <summary>
         /// Finds the walk distance in number of steps to a given spot from this building
         /// </summary>
         /// <param name="spot"></param>
         /// <returns></returns>
         public int FindWalkDistance(string spot) {
-            return Search(Location, new Point(9999, 9999), spot, 0);
+            return FindDistance(Location, new Point(9999, 9999), spot, 0);
         }
 
         /// <summary>
@@ -65,13 +88,13 @@ namespace AutoAlloApp
         /// <param name="goal"></param>
         /// <param name="stepsTaken"></param>
         /// <returns></returns>
-        private int Search(Point currentPos, Point lastPos, string goal, int stepsTaken) {
+        private int FindDistance(Point currentPos, Point lastPos, string goal, int stepsTaken) {
 
             (string, Point)[] directions = new (string, Point)[4] {
-            (matrix[currentPos.X + 1, currentPos.Y], new Point(currentPos.X + 1, currentPos.Y)),
-            (matrix[currentPos.X - 1, currentPos.Y], new Point(currentPos.X - 1, currentPos.Y)),
-            (matrix[currentPos.X, currentPos.Y + 1], new Point(currentPos.X, currentPos.Y + 1)),
-            (matrix[currentPos.X, currentPos.Y - 1], new Point(currentPos.X, currentPos.Y - 1))
+                (matrix[currentPos.X + 1, currentPos.Y], new Point(currentPos.X + 1, currentPos.Y)),
+                (matrix[currentPos.X - 1, currentPos.Y], new Point(currentPos.X - 1, currentPos.Y)),
+                (matrix[currentPos.X, currentPos.Y + 1], new Point(currentPos.X, currentPos.Y + 1)),
+                (matrix[currentPos.X, currentPos.Y - 1], new Point(currentPos.X, currentPos.Y - 1))
             };
 
             if (directions.Any(x => x.Item1 == goal)) {
@@ -82,7 +105,7 @@ namespace AutoAlloApp
             {
                 if (d.Item1 == "&" && d.Item2 != lastPos)
                 {
-                    int placeHolder = Search(d.Item2, currentPos, goal, stepsTaken + 1);
+                    int placeHolder = FindDistance(d.Item2, currentPos, goal, stepsTaken + 1);
                     if (placeHolder != -1)
                     {
                         return placeHolder;

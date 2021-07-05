@@ -71,12 +71,9 @@ namespace AutoAlloApp
 
             //While there exists reservations with no allocated parking spot
             while (reservations.Any(x => x.ParkingSpot.Length < 1)) {
-                break;
+                
             }
 
-            foreach (Building b in buildings) {
-                Console.WriteLine(b.Name + " = " + b.FindWalkDistance("C 008") + " Steps");
-            }
         }
 
         /// <summary>
