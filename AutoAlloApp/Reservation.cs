@@ -8,32 +8,38 @@ namespace AutoAlloApp
 {
     class Reservation
     {
-        public string personKey { get; private set; }
+        private string parkingSpot = "";
+        public string ParkingSpot {
+            set => parkingSpot = value;
+            get => parkingSpot;
+        }
+        public string PersonKey { get; private set; }
 
-        public string parkingAgreementCode { get; private set; }
+        public string ParkingAgreementCode { get; private set; }
 
-        public string roomKey { get; private set; }
+        public string RoomKey { get; private set; }
 
-        public string contractType { get; private set; }
+        public string ContractType { get; private set; }
 
-        public int houseNumber {
+        public int HouseNumber {
+
             get { 
-                return roomKey.ToUpper() == "NULL" ? 0 : Int16.Parse(roomKey.Split("_")[1]); 
+                return RoomKey.ToUpper() == "NULL" ? 99999 : Int16.Parse(RoomKey.Split("_")[1]); 
             }
         }
 
-        public int roomNumber
+        public int RoomNumber
         {
             get
             {
-                return roomKey.ToUpper() == "NULL" ? 0 : Int16.Parse(roomKey.Split("_")[2]);
+                return RoomKey.ToUpper() == "NULL" ? 99999 : Int16.Parse(RoomKey.Split("_")[2]);
             }
         }
 
-        public string priority {
+        public string Priority {
             get {
 
-                return contractType switch
+                return ContractType switch
                 {
                     "RES" => "gold",
                     "SOMMER" => "bronze",
@@ -42,9 +48,9 @@ namespace AutoAlloApp
             }
         }
 
-        public int priorityNumber {
+        public int PriorityNumber {
             get {
-                return priority switch
+                return Priority switch
                 {
                     "gold" => 1,
                     "silver" => 2,
@@ -56,10 +62,10 @@ namespace AutoAlloApp
 
         public Reservation(string personKey, string parkingAgreementCode, string roomKey, string contractType) {
 
-            this.personKey = personKey;
-            this.parkingAgreementCode = parkingAgreementCode;
-            this.roomKey = roomKey;
-            this.contractType = contractType;
+            this.PersonKey = personKey;
+            this.ParkingAgreementCode = parkingAgreementCode;
+            this.RoomKey = roomKey;
+            this.ContractType = contractType;
 
         }
     }

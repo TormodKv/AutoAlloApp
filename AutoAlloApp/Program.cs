@@ -1,9 +1,13 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 
 namespace AutoAlloApp
 {
+
+
     static class Program
     {
 
@@ -12,20 +16,19 @@ namespace AutoAlloApp
         private static string RESULTLOCATION = AppDomain.CurrentDomain.BaseDirectory.Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
 
         static string[,] matrix;
-        static Dictionary<string, Point> buildingLocations;
-        
-        //normal parking spots
-        static Dictionary<string, Point> spotLocations;
 
         static List<Reservation> reservations;
+        static List<Building> buildings;
 
         //Key: Spot name. Value: Building affiliation
         static Dictionary<string, string> spots;
         
         static void Main(string[] args)
         {
-            buildingLocations = new();
+           
             reservations = new();
+            buildings = new();
+            spots = new();
 
             FillReservations();
 
@@ -44,28 +47,38 @@ namespace AutoAlloApp
                     string cell = splitLine[x].Trim();
                     matrix[x, y] = cell;
 
-                    //Indexing for good measure
-                    //           V
+                    //Indexing
+                    //   V
 
                     //Cell is a comment
                     if (cell.Contains("#"))
-                        return;
+                        continue;
 
                     //Cell i a building
                     if (cell.IsBuilding())
-                        buildingLocations.Add(cell, new Point(x, y));
+                        buildings.Add(new Building(cell, new Point(x, y)));
 
                     //Cell is a normal parking spot
                     else if (cell.IsSpot())
-                        spotLocations.Add(cell, new Point(x, y));
+                        spots.Add(cell, "");
 
                 }
+            }
+
+            //Sets the number of reservations (with parking) per building
+            foreach (Building building in buildings) {
+                building.neededNumberOfSpots = building.NumberOfReservations();
+            }
+
+            //While there exists reservations with no allocated parking spot
+            while (reservations.Any(x => x.ParkingSpot.Length < 1)) {
+                
             }
 
         }
 
         /// <summary>
-        /// Return true if the cell is a normal parking spot
+        /// Return true if the cell is a normal parking spot. Excludes HC
         /// </summary>
         /// <param name="cell"></param>
         /// <returns></returns>
@@ -109,6 +122,25 @@ namespace AutoAlloApp
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Prints the number of affiliated spots given the building name
+        /// </summary>
+        /// <param name="building"></param>
+        /// <returns></returns>
+        private static int NumberOfAffiliatedSpots(this string building) 
+        {
+            if (!building.IsBuilding()) {
+                throw new InvalidDataException();
+            }
+
+            return spots.Where(x => x.Value.ToUpper().Trim() == building.ToUpper().Trim()).Count();
+        }
+
+        private static int NumberOfReservations(this Building building) {
+
+            return reservations.Where(x => x.HouseNumber == building.BuildingNumber).Count();
         }
 
         /// <summary>
