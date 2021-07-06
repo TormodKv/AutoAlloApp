@@ -48,6 +48,10 @@ namespace AutoAlloApp
                     string cell = splitLine[x].Trim();
                     matrix[x, y] = cell;
 
+                    if (spots.ContainsKey(cell)) {
+                        throw new InvalidDataException();
+                    }
+
                     //Indexing
                     //   V
 
@@ -95,14 +99,32 @@ namespace AutoAlloApp
 
             }
 
+            PrintData();
 
-            createFile();
+
+            CreateFile();
             //Optional. Just for visualization
-            createHeatMap();
+            CreateHeatMap();
 
         }
 
-        private static void createHeatMap()
+        private static void PrintData()
+        {
+            float avereageDistance = 0;
+            float highest = 0;
+            float lowest = 9999;
+
+            foreach (Building b in buildings) {
+                float thisAvg = b.AvgWalkDistance;
+                highest = highest > thisAvg ? highest : thisAvg;
+                lowest = lowest < thisAvg ? lowest : thisAvg;
+                avereageDistance += thisAvg;
+            }
+
+            Console.WriteLine($"Avareage distance: {avereageDistance / buildings.Count} Biggest difference: {highest - lowest}");
+        }
+
+        private static void CreateHeatMap()
         {
             string[] lines = File.ReadAllLines(MAPLOCATION);
             int rowCount = lines.Length; //Y values
@@ -130,7 +152,7 @@ namespace AutoAlloApp
             File.WriteAllLines(RESULTLOCATION + "HeatMap.csv", lines);
         }
 
-        private static void createFile()
+        private static void CreateFile()
         {
             string[] lines = new string[reservations.Count + 1];
 
@@ -138,7 +160,7 @@ namespace AutoAlloApp
 
             for (int i = 1; i < reservations.Count; i++) {
                 Reservation res = reservations[i];
-                lines[i] = res.ParkingSpot + ";" + res.PriorityNumber + ";" + res.PersonKey + ";" + res.RoomKey + ";" + res.ArrivalDate + ";" + res.Building;
+                lines[i] = res.ParkingSpot + ";" + res.PriorityNumber + ";" + res.PersonKey + ";" + res.RoomKey + ";" + res.ArrivalDate;
             }
 
             File.WriteAllLines(RESULTLOCATION + "Result.csv", lines);
