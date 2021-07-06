@@ -69,9 +69,27 @@ namespace AutoAlloApp
                 building.neededNumberOfSpots = building.NumberOfReservations();
             }
 
-            //While there exists reservations with no allocated parking spot
-            while (reservations.Any(x => x.ParkingSpot.Length < 1)) {
-                
+            //Combine buildings and spots
+            while (buildings.Any(x => x.PercentageAllocated < 1)) {
+
+                //the worst building that isn't already filled with spots - give it a spot
+                buildings.Where(x => x.PercentageAllocated < 1).OrderByDescending(x => x.Badness).First().AquireNearestSpot(spots);
+
+            }
+
+            //combine reservations and spots
+            foreach (Reservation res in reservations) {
+
+                if (res.ParkingSpot.Length > 0) {
+                    buildings.First(x => x.Name == res.Building).spots.Remove(res.ParkingSpot);
+                    continue;
+                }
+
+                string bestSpot = buildings.First(x => x.Name == res.Building).spots.First();
+                res.ParkingSpot = bestSpot;
+                buildings.First(x => x.Name == res.Building).spots.Remove(bestSpot);
+
+
             }
 
         }
@@ -81,7 +99,7 @@ namespace AutoAlloApp
         /// </summary>
         /// <param name="cell"></param>
         /// <returns></returns>
-        private static bool IsSpot(this string cell)
+        public static bool IsSpot(this string cell)
         {
             if (cell.Trim().Split(" ").Length == 2)
             {
@@ -139,7 +157,7 @@ namespace AutoAlloApp
 
         private static int NumberOfReservations(this Building building) {
 
-            return reservations.Where(x => x.HouseNumber == building.BuildingNumber).Count();
+            return reservations.Where(x => x.BuildingNumber == building.BuildingNumber).Count();
         }
 
         /// <summary>
@@ -158,8 +176,16 @@ namespace AutoAlloApp
                 // We are working with literal "NULL" instead of "" for null values.
 
                 string[] splitLine = line.Split(";");
+
+                if (splitLine[3] == "NULL" || splitLine[3] == "")
+                    continue;
+
                 reservations.Add(new Reservation(splitLine[2], splitLine[5], splitLine[3], splitLine[4]));
             }
+
+            //how the reservations should be ordered.
+            //Take history into consideration in the future
+            reservations = reservations.OrderByDescending(x => x.PriorityNumber).ToList();
         }
     }
         

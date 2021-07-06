@@ -9,7 +9,7 @@ namespace AutoAlloApp
 {
     class Building
     {
-        //Spots affiliated with this building
+        //Spots affiliated with this building. This is automatically sorted. best first
         public List<string> spots = new();
 
         public int neededNumberOfSpots;
@@ -61,14 +61,45 @@ namespace AutoAlloApp
         private string[,] matrix { get => Program.matrix; }
 
         public void AquireNearestSpot(Dictionary<string, string> spotDict) {
-            string spot = FindNearest(spotDict);
+            string spot = FindNearest(Location, new Point(9999,9999), spotDict, 0).Item1;
             spots.Add(spot);
             spotDict[spot] = Name;
         }
 
-        private string FindNearest(Dictionary<string, string> spotDict)
+        private (string, int) FindNearest(Point currentPos, Point lastPos, Dictionary<string, string> spotDict, int stepsTaken)
         {
-            throw new NotImplementedException();
+            (string, Point)[] directions = new (string, Point)[4] {
+                (matrix[currentPos.X + 1, currentPos.Y], new Point(currentPos.X + 1, currentPos.Y)),
+                (matrix[currentPos.X - 1, currentPos.Y], new Point(currentPos.X - 1, currentPos.Y)),
+                (matrix[currentPos.X, currentPos.Y + 1], new Point(currentPos.X, currentPos.Y + 1)),
+                (matrix[currentPos.X, currentPos.Y - 1], new Point(currentPos.X, currentPos.Y - 1))
+            };
+
+            (string, int) bestSpot = (directions.FirstOrDefault(x => spotDict.ContainsKey(x.Item1) && x.Item1.IsSpot() && spotDict[x.Item1] == "").Item1 , stepsTaken +1);
+
+            if (bestSpot.Item1 != null && bestSpot.Item1 != "") {
+                return bestSpot;
+            }
+
+            List<(string, int)> candidateSpots = new();
+
+            foreach ((string, Point) d in directions)
+            {
+                if (d.Item1 == "&" && d.Item2 != lastPos)
+                {
+                    candidateSpots.Add(FindNearest(d.Item2, currentPos, spotDict, stepsTaken + 1));
+                }
+            }
+
+            if (candidateSpots.Count == 0)
+            {
+                return ("", 0);
+            }
+            else 
+            {
+                return candidateSpots.OrderByDescending(x => x.Item2).Last();    
+            }
+
         }
 
         /// <summary>

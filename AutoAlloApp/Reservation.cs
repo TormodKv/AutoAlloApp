@@ -21,10 +21,16 @@ namespace AutoAlloApp
 
         public string ContractType { get; private set; }
 
-        public int HouseNumber {
+        public int BuildingNumber {
 
             get { 
                 return RoomKey.ToUpper() == "NULL" ? 99999 : Int16.Parse(RoomKey.Split("_")[1]); 
+            }
+        }
+
+        public string Building {
+            get {
+                return "X " + BuildingNumber.ToString();
             }
         }
 
@@ -48,13 +54,16 @@ namespace AutoAlloApp
             }
         }
 
+        /// <summary>
+        /// Translates the priority to numbers. 3 is the highest priority
+        /// </summary>
         public int PriorityNumber {
             get {
                 return Priority switch
                 {
-                    "gold" => 1,
+                    "gold" => 3,
                     "silver" => 2,
-                    "bronze" => 3,
+                    "bronze" => 1,
                     _ => 2,
                 };
             }
