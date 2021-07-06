@@ -21,6 +21,10 @@ namespace AutoAlloApp
 
         public string ContractType { get; private set; }
 
+        public string ArrivalDate { get; private set; }
+
+        public string DepartureDate { get; private set; }
+
         public int BuildingNumber {
 
             get { 
@@ -57,7 +61,7 @@ namespace AutoAlloApp
         /// <summary>
         /// Translates the priority to numbers. 3 is the highest priority
         /// </summary>
-        public int PriorityNumber {
+        public int InvertedPriorityNumber {
             get {
                 return Priority switch
                 {
@@ -69,12 +73,31 @@ namespace AutoAlloApp
             }
         }
 
-        public Reservation(string personKey, string parkingAgreementCode, string roomKey, string contractType) {
+        /// <summary>
+        /// Translates the priority to numbers. 1 is the highest priority
+        /// </summary>
+        public int PriorityNumber
+        {
+            get
+            {
+                return Priority switch
+                {
+                    "gold" => 1,
+                    "silver" => 2,
+                    "bronze" => 3,
+                    _ => 2,
+                };
+            }
+        }
+
+        public Reservation(string personKey, string parkingAgreementCode, string roomKey, string contractType, string ArrivalDate, string DepartureDate) {
 
             this.PersonKey = personKey;
             this.ParkingAgreementCode = parkingAgreementCode;
             this.RoomKey = roomKey;
             this.ContractType = contractType;
+            this.ArrivalDate = ArrivalDate;
+            this.DepartureDate = DepartureDate;
 
         }
     }

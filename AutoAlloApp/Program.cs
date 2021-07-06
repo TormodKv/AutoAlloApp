@@ -12,12 +12,14 @@ namespace AutoAlloApp
 
         private static string MAPLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Map.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string EXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Export.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
+        private static string OLDEXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "OldExport.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string RESULTLOCATION = AppDomain.CurrentDomain.BaseDirectory.Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
 
         public static string[,] matrix;
 
         static List<Reservation> reservations;
         static List<Building> buildings;
+        public static float scale = 1.5f;
 
         //Key: Spot name. Value: Building affiliation
         static Dictionary<string, string> spots;
@@ -82,16 +84,64 @@ namespace AutoAlloApp
 
                 if (res.ParkingSpot.Length > 0) {
                     buildings.First(x => x.Name == res.Building).spots.Remove(res.ParkingSpot);
+                    buildings.First(x => x.Name == res.Building).spots.Add(res.ParkingSpot);
                     continue;
                 }
 
                 string bestSpot = buildings.First(x => x.Name == res.Building).spots.First();
                 res.ParkingSpot = bestSpot;
                 buildings.First(x => x.Name == res.Building).spots.Remove(bestSpot);
-
+                buildings.First(x => x.Name == res.Building).spots.Add(bestSpot);
 
             }
 
+
+            createFile();
+            //Optional. Just for visualization
+            createHeatMap();
+
+        }
+
+        private static void createHeatMap()
+        {
+            string[] lines = File.ReadAllLines(MAPLOCATION);
+            int rowCount = lines.Length; //Y values
+            int columnCount = lines[0].Split(';').Length; //X values
+
+            for (int y = 0; y < rowCount; y++)
+            {
+
+                string[] splitLine = lines[y].Split(';');
+
+                for (int x = 0; x < columnCount; x++)
+                {
+                    string cell = splitLine[x].Trim();
+
+                    if (cell.IsSpot() && spots.ContainsKey(cell)) {
+
+                        splitLine[x] = cell + " Z" + spots[cell];
+                    }
+
+                }
+
+                lines[y] = String.Join(";", splitLine);
+            }
+
+            File.WriteAllLines(RESULTLOCATION + "HeatMap.csv", lines);
+        }
+
+        private static void createFile()
+        {
+            string[] lines = new string[reservations.Count + 1];
+
+            lines[0] = "SpotNumber;Priority;PersonKey;RoomKey;ArrivalDate";
+
+            for (int i = 1; i < reservations.Count; i++) {
+                Reservation res = reservations[i];
+                lines[i] = res.ParkingSpot + ";" + res.PriorityNumber + ";" + res.PersonKey + ";" + res.RoomKey + ";" + res.ArrivalDate + ";" + res.Building;
+            }
+
+            File.WriteAllLines(RESULTLOCATION + "Result.csv", lines);
         }
 
         /// <summary>
@@ -177,15 +227,16 @@ namespace AutoAlloApp
 
                 string[] splitLine = line.Split(";");
 
+                //If roomkey doesn't exist. Skip to the next
                 if (splitLine[3] == "NULL" || splitLine[3] == "")
                     continue;
 
-                reservations.Add(new Reservation(splitLine[2], splitLine[5], splitLine[3], splitLine[4]));
+                reservations.Add(new Reservation(splitLine[2], splitLine[5], splitLine[3], splitLine[4], splitLine[0], splitLine[1]));
             }
 
             //how the reservations should be ordered.
             //Take history into consideration in the future
-            reservations = reservations.OrderByDescending(x => x.PriorityNumber).ToList();
+            reservations = reservations.OrderByDescending(x => x.InvertedPriorityNumber).ToList();
         }
     }
         

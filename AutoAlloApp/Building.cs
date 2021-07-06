@@ -31,8 +31,7 @@ namespace AutoAlloApp
         public float Badness
         {
             get {
-                float scale = 1f;
-                return AvgWalkDistance + (((1 - PercentageAllocated) * 100) * scale);
+                return AvgWalkDistance + (((1 - PercentageAllocated) * 100) * Program.scale);
             }
         }
 
@@ -50,6 +49,9 @@ namespace AutoAlloApp
         /// </summary>
         public float AvgWalkDistance {
             get {
+                if (spots.Count == 0)
+                    return 0;
+
                 float avg = 0;
                 foreach (string spot in spots) {
                     avg += FindWalkDistance(spot);
@@ -75,7 +77,7 @@ namespace AutoAlloApp
                 (matrix[currentPos.X, currentPos.Y - 1], new Point(currentPos.X, currentPos.Y - 1))
             };
 
-            (string, int) bestSpot = (directions.FirstOrDefault(x => spotDict.ContainsKey(x.Item1) && x.Item1.IsSpot() && spotDict[x.Item1] == "").Item1 , stepsTaken +1);
+            (string, int) bestSpot = (directions.FirstOrDefault(x => spotDict.ContainsKey(x.Item1) && x.Item1.IsSpot() && (spotDict[x.Item1] == "" || spotDict[x.Item1] == null)).Item1 , stepsTaken +1);
 
             if (bestSpot.Item1 != null && bestSpot.Item1 != "") {
                 return bestSpot;
@@ -93,7 +95,7 @@ namespace AutoAlloApp
 
             if (candidateSpots.Count == 0)
             {
-                return ("", 0);
+                return ("U1", 99999);
             }
             else 
             {
