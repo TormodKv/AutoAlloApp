@@ -6,9 +6,18 @@ using System.Linq;
 
 namespace AutoAlloApp
 {
+    enum AllocateAlgorithm { 
+        FirstAndBest,
+        FirstAndBestFair,
+        CustomOrder,
+        CustomOrderSinglePercent
+    }
 
     static class Program
     {
+        private static AllocateAlgorithm AlloAlgo = AllocateAlgorithm.CustomOrderSinglePercent;
+        static int[] customOrder = new int[] { 1, 3, 5, 22, 24, 7, 18, 20, 16, 2, 10, 14 ,12, 4};
+        static float singlePercent = 0.7f;
 
         private static string MAPLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Map.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string EXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Export.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
@@ -27,10 +36,13 @@ namespace AutoAlloApp
         
         static void Main(string[] args)
         {
+            if (AlloAlgo is AllocateAlgorithm.FirstAndBest or AllocateAlgorithm.CustomOrder)
+                scale = 1000;
+
             oldReservations = new();
             reservations = new();
             buildings = new();
-            spots =  new();
+            spots = new();
 
             FillReservations();
 
@@ -38,9 +50,10 @@ namespace AutoAlloApp
             int rowCount = lines.Length; //Y values
             int columnCount = lines[0].Split(';').Length; //X values
 
-            matrix = new string[columnCount , rowCount];
+            matrix = new string[columnCount, rowCount];
 
-            for (int y = 0; y < rowCount; y++) {
+            for (int y = 0; y < rowCount; y++)
+            {
 
                 string[] splitLine = lines[y].Split(';');
 
@@ -49,7 +62,8 @@ namespace AutoAlloApp
                     string cell = splitLine[x].Trim();
                     matrix[x, y] = cell;
 
-                    if (spots.ContainsKey(cell)) {
+                    if (spots.ContainsKey(cell))
+                    {
                         throw new InvalidDataException();
                     }
 
@@ -74,22 +88,58 @@ namespace AutoAlloApp
             FillOldReservations();
 
             //Sets the number of reservations (with parking) per building
-            foreach (Building building in buildings) {
+            foreach (Building building in buildings)
+            {
                 building.neededNumberOfSpots = building.NumberOfReservations();
             }
 
+            int customOrderIndex = 0;
+            float phPercent = singlePercent;
             //Combine buildings and spots
-            while (buildings.Any(x => x.PercentageAllocated < 1)) {
+            while (buildings.Any(x => x.PercentageAllocated < 1))
+            {
 
-                //the worst building that isn't already filled with spots - give it a spot
-                buildings.Where(x => x.PercentageAllocated < 1).OrderByDescending(x => x.Badness).First().AquireNearestSpot(spots);
+                switch (AlloAlgo)
+                {
+                    case AllocateAlgorithm.CustomOrder:
+                        Building building1 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
+                        while (building1.PercentageAllocated < 1)
+                        {
+                            building1.AquireNearestSpot(spots);
+                        }
+                        customOrderIndex++;
+                        break;
+                    case AllocateAlgorithm.CustomOrderSinglePercent:
+                        if (customOrderIndex >= customOrder.Length)
+                        {
+                            phPercent = 1;
+                            customOrderIndex = 0;
+                        }
+
+                        Building building2 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
+                        while (building2.PercentageAllocated < phPercent)
+                        {
+                            building2.AquireNearestSpot(spots);
+                        }
+                        customOrderIndex++;
+
+                        break;
+                    case AllocateAlgorithm.FirstAndBest:
+                    case AllocateAlgorithm.FirstAndBestFair:
+                        //the worst building that isn't already filled with spots - give it a spot
+                        buildings.Where(x => x.PercentageAllocated < 1).OrderByDescending(x => x.Badness).First().AquireNearestSpot(spots);
+                        break;
+
+                }
 
             }
 
             //combine reservations and spots
-            foreach (Reservation res in reservations) {
+            foreach (Reservation res in reservations)
+            {
 
-                if (res.ParkingSpot.Length > 0) {
+                if (res.ParkingSpot.Length > 0)
+                {
                     buildings.First(x => x.Name == res.Building).spots.Remove(res.ParkingSpot);
                     buildings.First(x => x.Name == res.Building).spots.Add(res.ParkingSpot);
                     continue;
@@ -103,6 +153,7 @@ namespace AutoAlloApp
             }
 
             PrintData();
+
 
             CreateFile();
             //Optional. Just for visualization
@@ -132,11 +183,19 @@ namespace AutoAlloApp
 
                 string[] splitLine = line.Split(";");
 
-                string arrival = splitLine[7].Split(" ")[1].Replace(".", "-");
+                string arrival = splitLine[7].Split(" ")[0];
+                //swapping
+                string[] arrivalArray = arrival.Split(".");
+                string year = arrivalArray[2];
+                string month = arrivalArray[1];
+                string day = arrivalArray[0];
+
+                arrival = $"{year}-{month}-{day}";
+            
+
                 string parkingSpot = splitLine[0];
 
-                Reservation mirrorReservation = reservations.FirstOrDefault(x => x.PersonKey == splitLine[4] && x.RoomKey == splitLine[5] &&
-                        Math.Abs(Int16.Parse(x.ArrivalDate.Split("-")[2]) - Int16.Parse(arrival.Split("-")[2])) < 3);
+                Reservation mirrorReservation = reservations.FirstOrDefault(x => x.PersonKey == splitLine[4] && x.RoomKey == splitLine[5] && arrival == x.ArrivalDate);
 
                 mirrorReservation.ParkingSpot = parkingSpot;
 
