@@ -62,13 +62,13 @@ namespace AutoAlloApp
 
         private string[,] matrix { get => Program.matrix; }
 
-        public void AquireNearestSpot(Dictionary<string, string> spotDict) {
+        public void AquireNearestSpot(Dictionary<string, bool> spotDict) {
             string spot = FindNearest(Location, new Point(9999,9999), spotDict, 0).Item1;
             spots.Add(spot);
-            spotDict[spot] = Name;
+            spotDict[spot] = true;
         }
 
-        private (string, int) FindNearest(Point currentPos, Point lastPos, Dictionary<string, string> spotDict, int stepsTaken)
+        private (string, int) FindNearest(Point currentPos, Point lastPos, Dictionary<string, bool> spotDict, int stepsTaken)
         {
             (string, Point)[] directions = new (string, Point)[4] {
                 (matrix[currentPos.X + 1, currentPos.Y], new Point(currentPos.X + 1, currentPos.Y)),
@@ -77,7 +77,7 @@ namespace AutoAlloApp
                 (matrix[currentPos.X, currentPos.Y - 1], new Point(currentPos.X, currentPos.Y - 1))
             };
 
-            (string, int) bestSpot = (directions.FirstOrDefault(x => spotDict.ContainsKey(x.Item1) && x.Item1.IsSpot() && (spotDict[x.Item1] == "" || spotDict[x.Item1] == null)).Item1 , stepsTaken +1);
+            (string, int) bestSpot = (directions.FirstOrDefault(x => spotDict.ContainsKey(x.Item1) && x.Item1.IsSpot() && spotDict[x.Item1] == false).Item1 , stepsTaken +1);
 
             if (bestSpot.Item1 != null && bestSpot.Item1 != "") {
                 return bestSpot;

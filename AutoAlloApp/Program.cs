@@ -22,8 +22,8 @@ namespace AutoAlloApp
         static List<Building> buildings;
         public static float scale = 1.5f;
 
-        //Key: Spot name. Value: Building affiliation
-        static Dictionary<string, string> spots;
+        //Key: Spot name. Value: occupied
+        static Dictionary<string, bool> spots;
         
         static void Main(string[] args)
         {
@@ -66,7 +66,7 @@ namespace AutoAlloApp
 
                     //Cell is a normal parking spot
                     else if (cell.IsSpot())
-                        spots.Add(cell, "");
+                        spots.Add(cell, false);
 
                 }
             }
@@ -115,6 +115,10 @@ namespace AutoAlloApp
         /// </summary>
         private static void FillOldReservations()
         {
+            if (!File.Exists(OLDEXPORTLOCATION)) {
+                return;
+            }
+
             //Eventually replace this with a query to a database
             string[] lines = File.ReadAllLines(OLDEXPORTLOCATION);
 
@@ -139,7 +143,7 @@ namespace AutoAlloApp
                 buildings.First(x => x.Name == mirrorReservation.Building).spots.Add(parkingSpot);
 
                 foreach (string spot in buildings.First(x => x.Name == mirrorReservation.Building).spots) {
-                    spots[spot] = "Replace this line with actual building number";
+                    spots[spot] = true;
                 }
 
             }
@@ -178,7 +182,13 @@ namespace AutoAlloApp
 
                     if (cell.IsSpot() && spots.ContainsKey(cell)) {
 
-                        splitLine[x] = cell + " Z" + spots[cell];
+                        //This query is kinda time consuming
+                        Building? building = buildings.FirstOrDefault(x => x.spots.Contains(cell));
+
+                        if (building != null) { 
+                            splitLine[x] = cell + " Z " + building.BuildingNumber.ToString();
+                        }
+                        
                     }
 
                 }
@@ -250,19 +260,6 @@ namespace AutoAlloApp
             return false;
         }
 
-        /// <summary>
-        /// Prints the number of affiliated spots given the building name
-        /// </summary>
-        /// <param name="building"></param>
-        /// <returns></returns>
-        private static int NumberOfAffiliatedSpots(this string building) 
-        {
-            if (!building.IsBuilding()) {
-                throw new InvalidDataException();
-            }
-
-            return spots.Where(x => x.Value.ToUpper().Trim() == building.ToUpper().Trim()).Count();
-        }
 
         private static int NumberOfReservations(this Building building) {
 
