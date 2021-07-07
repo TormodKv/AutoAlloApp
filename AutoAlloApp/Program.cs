@@ -16,18 +16,21 @@ namespace AutoAlloApp
 
     static class Program
     {
-        private static AllocateAlgorithm AlloAlgo = AllocateAlgorithm.FirstAndBestFair;
+        //Choose any of the alorhithms for different results.
+        private static AllocateAlgorithm allocationAlorithm = AllocateAlgorithm.FirstAndBestFair;
 
-        //Trial and error constants. Some work better than other. Run multiple test to find the best
+        //Trial and error variables. Some work better than other. Run multiple test to find the best
         static int[] customOrder = new int[] { 1, 3, 5, 22, 24, 7, 18, 20, 16, 2, 10, 14 ,12, 4};
         static float singlePercent = 0.7f;
         public static float scale = 1.5f;
 
+        //File locations
         private static string MAPLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Map.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string EXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Export.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string OLDEXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "OldExport.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string RESULTLOCATION = AppDomain.CurrentDomain.BaseDirectory.Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
 
+        //The main grid of the parking garage
         public static string[,] matrix;
 
         static List<Reservation> oldReservations;
@@ -40,7 +43,7 @@ namespace AutoAlloApp
         static void Main(string[] args)
         {
 
-            if (AlloAlgo is AllocateAlgorithm.FirstAndBest or AllocateAlgorithm.CustomOrder or AllocateAlgorithm.CustomOrderSinglePercentWithFirstAndBest)
+            if (allocationAlorithm is AllocateAlgorithm.FirstAndBest or AllocateAlgorithm.CustomOrder or AllocateAlgorithm.CustomOrderSinglePercentWithFirstAndBest)
                 scale = 100f;
 
             oldReservations = new();
@@ -98,12 +101,12 @@ namespace AutoAlloApp
             }
 
             int customOrderIndex = 0;
-            float phPercent = singlePercent;
+
             //Combine buildings and spots
             while (buildings.Any(x => x.PercentageAllocated < 1))
             {
-
-                switch (AlloAlgo)
+                
+                switch (allocationAlorithm)
                 {
                     case AllocateAlgorithm.CustomOrder:
                         Building building1 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
@@ -117,12 +120,12 @@ namespace AutoAlloApp
                     case AllocateAlgorithm.CustomOrderSinglePercent:
                         if (customOrderIndex >= customOrder.Length)
                         {
-                            phPercent = 1;
+                            singlePercent = 1;
                             customOrderIndex = 0;
                         }
 
                         Building building2 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
-                        while (building2.PercentageAllocated < phPercent)
+                        while (building2.PercentageAllocated < singlePercent)
                         {
                             building2.AquireNearestSpot(spots);
                         }
@@ -133,7 +136,7 @@ namespace AutoAlloApp
                     case AllocateAlgorithm.CustomOrderSinglePercentWithFirstAndBest:
 
                         Building building3 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
-                        while (building3.PercentageAllocated < phPercent)
+                        while (building3.PercentageAllocated < singlePercent)
                         {
                             building3.AquireNearestSpot(spots);
                         }
@@ -141,7 +144,7 @@ namespace AutoAlloApp
 
                         if (customOrderIndex >= customOrder.Length)
                         {
-                            AlloAlgo = AllocateAlgorithm.FirstAndBest;
+                            allocationAlorithm = AllocateAlgorithm.FirstAndBest;
                         }
 
                         break;
@@ -176,8 +179,9 @@ namespace AutoAlloApp
 
             PrintData();
 
-
+            
             CreateFile();
+
             //Optional. Just for visualization
             CreateHeatMap();
 
@@ -280,6 +284,9 @@ namespace AutoAlloApp
             File.WriteAllLines(RESULTLOCATION + "HeatMap.csv", lines);
         }
 
+        /// <summary>
+        /// Creates the final csv file for importing into HotelAdmin
+        /// </summary>
         private static void CreateFile()
         {
             string[] lines = new string[reservations.Count + 1];
@@ -312,21 +319,6 @@ namespace AutoAlloApp
         }
 
         /// <summary>
-        /// Return true if the cell is a handicap parking spot
-        /// </summary>
-        /// <param name="cell"></param>
-        /// <returns></returns>
-        private static bool IsHCSpot(this string cell)
-        {
-            if (cell.Contains("HC") && !cell.Contains("#"))
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        /// <summary>
         /// Return true if the cell is a building
         /// </summary>
         /// <param name="cell"></param>
@@ -341,16 +333,20 @@ namespace AutoAlloApp
             return false;
         }
 
-
+        /// <summary>
+        /// Returns the number of reservations for a given building
+        /// </summary>
+        /// <param name="building"></param>
+        /// <returns></returns>
         private static int NumberOfReservations(this Building building) {
 
-            int newRes = reservations.Where(x => x.BuildingNumber == building.BuildingNumber).Count();
-            int oldRes = oldReservations.Where(x => x.BuildingNumber == building.BuildingNumber).Count();
-            return oldRes + newRes;
+            int newReservationsCount = reservations.Where(x => x.BuildingNumber == building.BuildingNumber).Count();
+            int oldReservationsCount = oldReservations.Where(x => x.BuildingNumber == building.BuildingNumber).Count();
+            return oldReservationsCount + newReservationsCount;
         }
 
         /// <summary>
-        /// Fills up the reservation list with reservation export
+        /// Fills up the reservation list with reservation export from database
         /// </summary>
         private static void FillReservations()
         {
