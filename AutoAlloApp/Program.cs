@@ -10,14 +10,18 @@ namespace AutoAlloApp
         FirstAndBest,
         FirstAndBestFair,
         CustomOrder,
-        CustomOrderSinglePercent
+        CustomOrderSinglePercent,
+        CustomOrderSinglePercentWithFirstAndBest
     }
 
     static class Program
     {
-        private static AllocateAlgorithm AlloAlgo = AllocateAlgorithm.CustomOrderSinglePercent;
+        private static AllocateAlgorithm AlloAlgo = AllocateAlgorithm.FirstAndBestFair;
+
+        //Trial and error constants. Some work better than other. Run multiple test to find the best
         static int[] customOrder = new int[] { 1, 3, 5, 22, 24, 7, 18, 20, 16, 2, 10, 14 ,12, 4};
         static float singlePercent = 0.7f;
+        public static float scale = 1.5f;
 
         private static string MAPLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Map.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string EXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Export.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
@@ -29,15 +33,15 @@ namespace AutoAlloApp
         static List<Reservation> oldReservations;
         static List<Reservation> reservations;
         static List<Building> buildings;
-        public static float scale = 1.5f;
 
         //Key: Spot name. Value: occupied
         static Dictionary<string, bool> spots;
         
         static void Main(string[] args)
         {
-            if (AlloAlgo is AllocateAlgorithm.FirstAndBest or AllocateAlgorithm.CustomOrder)
-                scale = 1000;
+
+            if (AlloAlgo is AllocateAlgorithm.FirstAndBest or AllocateAlgorithm.CustomOrder or AllocateAlgorithm.CustomOrderSinglePercentWithFirstAndBest)
+                scale = 100f;
 
             oldReservations = new();
             reservations = new();
@@ -109,6 +113,7 @@ namespace AutoAlloApp
                         }
                         customOrderIndex++;
                         break;
+
                     case AllocateAlgorithm.CustomOrderSinglePercent:
                         if (customOrderIndex >= customOrder.Length)
                         {
@@ -124,6 +129,23 @@ namespace AutoAlloApp
                         customOrderIndex++;
 
                         break;
+
+                    case AllocateAlgorithm.CustomOrderSinglePercentWithFirstAndBest:
+
+                        Building building3 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
+                        while (building3.PercentageAllocated < phPercent)
+                        {
+                            building3.AquireNearestSpot(spots);
+                        }
+                        customOrderIndex++;
+
+                        if (customOrderIndex >= customOrder.Length)
+                        {
+                            AlloAlgo = AllocateAlgorithm.FirstAndBest;
+                        }
+
+                        break;
+
                     case AllocateAlgorithm.FirstAndBest:
                     case AllocateAlgorithm.FirstAndBestFair:
                         //the worst building that isn't already filled with spots - give it a spot
