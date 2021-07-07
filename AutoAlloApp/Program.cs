@@ -17,6 +17,7 @@ namespace AutoAlloApp
 
         public static string[,] matrix;
 
+        static List<Reservation> oldReservations;
         static List<Reservation> reservations;
         static List<Building> buildings;
         public static float scale = 1.5f;
@@ -26,10 +27,10 @@ namespace AutoAlloApp
         
         static void Main(string[] args)
         {
-           
+            oldReservations = new();
             reservations = new();
             buildings = new();
-            spots = new();
+            spots =  new();
 
             FillReservations();
 
@@ -70,6 +71,8 @@ namespace AutoAlloApp
                 }
             }
 
+            FillOldReservations();
+
             //Sets the number of reservations (with parking) per building
             foreach (Building building in buildings) {
                 building.neededNumberOfSpots = building.NumberOfReservations();
@@ -101,11 +104,45 @@ namespace AutoAlloApp
 
             PrintData();
 
-
             CreateFile();
             //Optional. Just for visualization
             CreateHeatMap();
 
+        }
+
+        /// <summary>
+        /// Gives the already handed out parking spot to an old customer
+        /// </summary>
+        private static void FillOldReservations()
+        {
+            //Eventually replace this with a query to a database
+            string[] lines = File.ReadAllLines(OLDEXPORTLOCATION);
+
+            foreach (string line in lines)
+            {
+
+                //Headers is as following:
+                //Parking Spot Number, Customer, Cell Phone, Email, Person Key, Room Key, Contract Type, Arrival Date, Departure Date, Status
+
+                // We are working with literal "NULL" instead of "" for null values.
+
+                string[] splitLine = line.Split(";");
+
+                string arrival = splitLine[7].Split(" ")[1].Replace(".", "-");
+                string parkingSpot = splitLine[0];
+
+                Reservation mirrorReservation = reservations.FirstOrDefault(x => x.PersonKey == splitLine[4] && x.RoomKey == splitLine[5] &&
+                        Math.Abs(Int16.Parse(x.ArrivalDate.Split("-")[2]) - Int16.Parse(arrival.Split("-")[2])) < 3);
+
+                mirrorReservation.ParkingSpot = parkingSpot;
+
+                buildings.First(x => x.Name == mirrorReservation.Building).spots.Add(parkingSpot);
+
+                foreach (string spot in buildings.First(x => x.Name == mirrorReservation.Building).spots) {
+                    spots[spot] = "Replace this line with actual building number";
+                }
+
+            }
         }
 
         private static void PrintData()
@@ -229,7 +266,9 @@ namespace AutoAlloApp
 
         private static int NumberOfReservations(this Building building) {
 
-            return reservations.Where(x => x.BuildingNumber == building.BuildingNumber).Count();
+            int newRes = reservations.Where(x => x.BuildingNumber == building.BuildingNumber).Count();
+            int oldRes = oldReservations.Where(x => x.BuildingNumber == building.BuildingNumber).Count();
+            return oldRes + newRes;
         }
 
         /// <summary>

@@ -15,6 +15,7 @@ namespace AutoAlloApp
         }
         public string PersonKey { get; private set; }
 
+        // Not really in use
         public string ParkingAgreementCode { get; private set; }
 
         public string RoomKey { get; private set; }
