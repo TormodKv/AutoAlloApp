@@ -11,13 +11,14 @@ namespace AutoAlloApp
         FirstAndBestFair,
         CustomOrder,
         CustomOrderSinglePercent,
-        CustomOrderSinglePercentWithFirstAndBest
+        CustomOrderSinglePercentWithFirstAndBest,
+        CustomOrderFill_A_to_G_First
     }
 
     static class Program
     {
         //Choose any of the alorhithms for different results.
-        private static AllocateAlgorithm allocationAlorithm = AllocateAlgorithm.FirstAndBestFair;
+        private static AllocateAlgorithm allocationAlorithm = AllocateAlgorithm.CustomOrderSinglePercent;
 
         //Trial and error variables. Some work better than other. Run multiple test to find the best
         static int[] customOrder = new int[] { 1, 3, 5, 22, 24, 7, 18, 20, 16, 2, 10, 14 ,12, 4};
@@ -146,6 +147,13 @@ namespace AutoAlloApp
                         {
                             allocationAlorithm = AllocateAlgorithm.FirstAndBest;
                         }
+
+                        break;
+
+                    case AllocateAlgorithm.CustomOrderFill_A_to_G_First:
+
+                        singlePercent = (float)spots.Count() / (float)spots.Where(x => !x.Key.Contains("U2")).Count();
+                        allocationAlorithm = AllocateAlgorithm.CustomOrderSinglePercentWithFirstAndBest;
 
                         break;
 
