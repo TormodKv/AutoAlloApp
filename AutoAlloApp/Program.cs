@@ -19,11 +19,16 @@ namespace AutoAlloApp
     static class Program
     {
         //Choose any of the alorhithms for different results.
-        public static AllocateAlgorithm allocationAlorithm = AllocateAlgorithm.ManualDividing;
+        public static AllocateAlgorithm original = AllocateAlgorithm.CustomOrderFill_A_to_G_First;
+        public static AllocateAlgorithm allocationAlorithm;
 
         //Trial and error variables. Some work better than other. Run multiple test to find the best
         static int[] customOrder = new int[] { 1, 3, 5, 22, 24, 7, 18, 20, 16, 2, 10, 14 ,12, 4};
-        static float singlePercent = 0.7f;
+
+        static float originalSinglePercent = 0.7f;
+        static float singlePercent;
+
+        public static float originalScale = 1.5f;
         public static float scale = 1.5f;
 
         //File locations
@@ -44,172 +49,189 @@ namespace AutoAlloApp
         
         static void Main(string[] args)
         {
+            int i = 12;
 
-            if (allocationAlorithm is AllocateAlgorithm.FirstAndBest or AllocateAlgorithm.CustomOrder or AllocateAlgorithm.CustomOrderSinglePercentWithFirstAndBest)
-                scale = 100f;
+            while ( i < 29 ) {
 
-            oldReservations = new();
-            reservations = new();
-            buildings = new();
-            spots = new();
+                allocationAlorithm = original;
+                singlePercent = originalSinglePercent;
+                scale = originalScale;
+                
+                EXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + $"{i}.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
+                i++;
 
-            FillReservations();
 
-            string[] lines = File.ReadAllLines(MAPLOCATION);
-            int rowCount = lines.Length; //Y values
-            int columnCount = lines[0].Split(';').Length; //X values
+                if (allocationAlorithm is AllocateAlgorithm.FirstAndBest or AllocateAlgorithm.CustomOrder or AllocateAlgorithm.CustomOrderSinglePercentWithFirstAndBest)
+                    scale = 100f;
 
-            matrix = new string[columnCount, rowCount];
+                oldReservations = new();
+                reservations = new();
+                buildings = new();
+                spots = new();
 
-            for (int y = 0; y < rowCount; y++)
-            {
+                FillReservations();
 
-                string[] splitLine = lines[y].Split(';');
+                string[] lines = File.ReadAllLines(MAPLOCATION);
+                int rowCount = lines.Length; //Y values
+                int columnCount = lines[0].Split(';').Length; //X values
 
-                for (int x = 0; x < columnCount; x++)
+                matrix = new string[columnCount, rowCount];
+
+                for (int y = 0; y < rowCount; y++)
                 {
-                    string cell = splitLine[x].Trim();
-                    matrix[x, y] = cell;
 
-                    if (spots.ContainsKey(cell))
+                    string[] splitLine = lines[y].Split(';');
+
+                    for (int x = 0; x < columnCount; x++)
                     {
-                        throw new InvalidDataException();
+                        string cell = splitLine[x].Trim();
+                        matrix[x, y] = cell;
+
+                        if (spots.ContainsKey(cell))
+                        {
+                            throw new InvalidDataException();
+                        }
+
+                        //Indexing
+                        //   V
+
+                        //Cell is a comment
+                        if (cell.Contains("#"))
+                            continue;
+
+                        //Cell i a building
+                        if (cell.IsBuilding())
+                            buildings.Add(new Building(cell, new Point(x, y)));
+
+                        //Cell is a normal parking spot
+                        else if (cell.IsSpot())
+                            spots.Add(cell, false);
+
+                    }
+                }
+
+                FillOldReservations();
+
+                //Sets the number of reservations (with parking) per building
+                foreach (Building building in buildings)
+                {
+                    building.neededNumberOfSpots = building.NumberOfReservations();
+                }
+
+                int customOrderIndex = 0;
+
+                //Combine buildings and spots
+                while (buildings.Any(x => x.PercentageAllocated < 1))
+                {
+
+                    switch (allocationAlorithm)
+                    {
+                        case AllocateAlgorithm.ManualDividing:
+                            Building building0 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
+                            while (true)
+                            {
+                                if (!building0.AquireNearestSpot(spots))
+                                    break;
+                            }
+                            customOrderIndex++;
+
+                            if (customOrderIndex >= customOrder.Length)
+                            {
+                                allocationAlorithm = AllocateAlgorithm.FirstAndBest;
+                            }
+
+                            break;
+
+                        case AllocateAlgorithm.CustomOrder:
+                            Building building1 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
+                            while (building1.PercentageAllocated < 1)
+                            {
+                                building1.AquireNearestSpot(spots);
+                            }
+                            customOrderIndex++;
+                            break;
+
+                        case AllocateAlgorithm.CustomOrderSinglePercent:
+                            if (customOrderIndex >= customOrder.Length)
+                            {
+                                singlePercent = 1;
+                                customOrderIndex = 0;
+                            }
+
+                            Building building2 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
+                            while (building2.PercentageAllocated < singlePercent)
+                            {
+                                building2.AquireNearestSpot(spots);
+                            }
+                            customOrderIndex++;
+
+                            break;
+
+                        case AllocateAlgorithm.CustomOrderSinglePercentWithFirstAndBest:
+
+                            Building building3 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
+                            while (building3.PercentageAllocated < singlePercent)
+                            {
+                                building3.AquireNearestSpot(spots);
+                            }
+                            customOrderIndex++;
+
+                            if (customOrderIndex >= customOrder.Length)
+                            {
+                                allocationAlorithm = AllocateAlgorithm.FirstAndBest;
+                            }
+
+                            break;
+
+                        case AllocateAlgorithm.CustomOrderFill_A_to_G_First:
+
+                            singlePercent = (float)spots.Where(x => !x.Key.Contains("U2")).Count() / (float)spots.Count();
+                            allocationAlorithm = AllocateAlgorithm.CustomOrderSinglePercentWithFirstAndBest;
+
+                            break;
+
+                        case AllocateAlgorithm.FirstAndBest:
+                        case AllocateAlgorithm.FirstAndBestFair:
+                            //the worst building that isn't already filled with spots - give it a spot
+                            buildings.Where(x => x.PercentageAllocated < 1).OrderByDescending(x => x.Badness).First().AquireNearestSpot(spots);
+                            break;
+
                     }
 
-                    //Indexing
-                    //   V
+                }
 
-                    //Cell is a comment
-                    if (cell.Contains("#"))
+                //combine reservations and spots
+                foreach (Reservation res in reservations)
+                {
+
+                    if (res.ParkingSpot.Length > 0)
+                    {
+                        buildings.First(x => x.Name == res.Building).spots.Remove(res.ParkingSpot);
+                        buildings.First(x => x.Name == res.Building).spots.Add(res.ParkingSpot);
                         continue;
+                    }
 
-                    //Cell i a building
-                    if (cell.IsBuilding())
-                        buildings.Add(new Building(cell, new Point(x, y)));
-
-                    //Cell is a normal parking spot
-                    else if (cell.IsSpot())
-                        spots.Add(cell, false);
-
-                }
-            }
-
-            FillOldReservations();
-
-            //Sets the number of reservations (with parking) per building
-            foreach (Building building in buildings)
-            {
-                building.neededNumberOfSpots = building.NumberOfReservations();
-            }
-
-            int customOrderIndex = 0;
-
-            //Combine buildings and spots
-            while (buildings.Any(x => x.PercentageAllocated < 1))
-            {
-                
-                switch (allocationAlorithm)
-                {
-                    case AllocateAlgorithm.ManualDividing:
-                        Building building0 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
-                        while (true)
-                        {
-                            if (!building0.AquireNearestSpot(spots))
-                                break;
-                        }
-                        customOrderIndex++;
-
-                        if (customOrderIndex >= customOrder.Length)
-                        {
-                            allocationAlorithm = AllocateAlgorithm.FirstAndBest;
-                        }
-
-                        break;
-
-                    case AllocateAlgorithm.CustomOrder:
-                        Building building1 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
-                        while (building1.PercentageAllocated < 1)
-                        {
-                            building1.AquireNearestSpot(spots);
-                        }
-                        customOrderIndex++;
-                        break;
-
-                    case AllocateAlgorithm.CustomOrderSinglePercent:
-                        if (customOrderIndex >= customOrder.Length)
-                        {
-                            singlePercent = 1;
-                            customOrderIndex = 0;
-                        }
-
-                        Building building2 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
-                        while (building2.PercentageAllocated < singlePercent)
-                        {
-                            building2.AquireNearestSpot(spots);
-                        }
-                        customOrderIndex++;
-
-                        break;
-
-                    case AllocateAlgorithm.CustomOrderSinglePercentWithFirstAndBest:
-
-                        Building building3 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
-                        while (building3.PercentageAllocated < singlePercent)
-                        {
-                            building3.AquireNearestSpot(spots);
-                        }
-                        customOrderIndex++;
-
-                        if (customOrderIndex >= customOrder.Length)
-                        {
-                            allocationAlorithm = AllocateAlgorithm.FirstAndBest;
-                        }
-
-                        break;
-
-                    case AllocateAlgorithm.CustomOrderFill_A_to_G_First:
-
-                        singlePercent = (float)spots.Count() / (float)spots.Where(x => !x.Key.Contains("U2")).Count();
-                        allocationAlorithm = AllocateAlgorithm.CustomOrderSinglePercentWithFirstAndBest;
-
-                        break;
-
-                    case AllocateAlgorithm.FirstAndBest:
-                    case AllocateAlgorithm.FirstAndBestFair:
-                        //the worst building that isn't already filled with spots - give it a spot
-                        buildings.Where(x => x.PercentageAllocated < 1).OrderByDescending(x => x.Badness).First().AquireNearestSpot(spots);
-                        break;
+                    string bestSpot = buildings.First(x => x.Name == res.Building).spots.First();
+                    res.ParkingSpot = bestSpot;
+                    buildings.First(x => x.Name == res.Building).spots.Remove(bestSpot);
+                    buildings.First(x => x.Name == res.Building).spots.Add(bestSpot);
 
                 }
 
-            }
+                PrintData();
 
-            //combine reservations and spots
-            foreach (Reservation res in reservations)
-            {
 
-                if (res.ParkingSpot.Length > 0)
-                {
-                    buildings.First(x => x.Name == res.Building).spots.Remove(res.ParkingSpot);
-                    buildings.First(x => x.Name == res.Building).spots.Add(res.ParkingSpot);
-                    continue;
-                }
+                CreateFile();
 
-                string bestSpot = buildings.First(x => x.Name == res.Building).spots.First();
-                res.ParkingSpot = bestSpot;
-                buildings.First(x => x.Name == res.Building).spots.Remove(bestSpot);
-                buildings.First(x => x.Name == res.Building).spots.Add(bestSpot);
+                //Optional. Just for visualization
+                CreateHeatMap();
+
+                //Optional. Just for testing multiple days
+                CreateOldExportFile();
 
             }
 
-            PrintData();
-
-            
-            CreateFile();
-
-            //Optional. Just for visualization
-            CreateHeatMap();
-
+            File.Delete(OLDEXPORTLOCATION);
         }
 
         /// <summary>
@@ -248,6 +270,9 @@ namespace AutoAlloApp
 
                 Reservation mirrorReservation = reservations.FirstOrDefault(x => x.PersonKey == splitLine[4] && x.RoomKey == splitLine[5] && arrival == x.ArrivalDate);
 
+                if (mirrorReservation == null)
+                    continue;
+
                 mirrorReservation.ParkingSpot = parkingSpot;
 
                 buildings.First(x => x.Name == mirrorReservation.Building).spots.Add(parkingSpot);
@@ -272,7 +297,7 @@ namespace AutoAlloApp
                 avereageDistance += thisAvg;
             }
 
-            Console.WriteLine($"Avareage distance: {avereageDistance / buildings.Count} Biggest difference: {highest - lowest}");
+            Console.WriteLine($"{avereageDistance / buildings.Count}                          {highest - lowest}");
         }
 
         private static void CreateHeatMap()
@@ -324,6 +349,22 @@ namespace AutoAlloApp
             }
 
             File.WriteAllLines(RESULTLOCATION + "Result.csv", lines);
+        }
+
+        /// <summary>
+        /// Creates the csv that would be used the next day. /!\ THIS IS JUST FOR TESTING PURPOSES /!\
+        /// </summary>
+        private static void CreateOldExportFile()
+        {
+            string[] lines = new string[reservations.Count];
+
+            for (int i = 0; i < reservations.Count; i++)
+            {
+                Reservation res = reservations[i];
+                lines[i] = $"{res.ParkingSpot};Person;91911217;a@b.com;{res.PersonKey};{res.RoomKey};{res.ArrivalDate.Split("-")[2]}.{res.ArrivalDate.Split("-")[1]}.{res.ArrivalDate.Split("-")[0]};{res.DepartureDate.Split("-")[2]}.{res.DepartureDate.Split("-")[1]}.{res.DepartureDate.Split("-")[0]};Confirmed";
+            }
+
+            File.WriteAllLines(RESULTLOCATION + "OldExport.csv", lines);
         }
 
         /// <summary>
