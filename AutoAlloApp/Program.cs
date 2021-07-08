@@ -41,10 +41,12 @@ namespace AutoAlloApp
 
             AddOldReservationsToReservationList();
 
-            UpdateBuildingsNumberOfSpots();
-
+            UpdateBuildingsNumberOfSpots(new int[] { 1 , 2 });
             AssignSpotsToBuildings();
+            AssignSpotsToReservations();
 
+            UpdateBuildingsNumberOfSpots(new int[] { 1, 2, 3 });
+            AssignSpotsToBuildings();
             AssignSpotsToReservations();
 
             PrintData();
@@ -56,12 +58,12 @@ namespace AutoAlloApp
 
         }
 
-        private static void UpdateBuildingsNumberOfSpots()
+        private static void UpdateBuildingsNumberOfSpots(int[] includedPriorities)
         {
             //Sets the number of reservations (with parking) per building
             foreach (Building building in buildings)
             {
-                building.neededNumberOfSpots = building.NumberOfReservations();
+                building.neededNumberOfSpots = building.NumberOfReservations(includedPriorities);
             }
         }
 
@@ -216,6 +218,11 @@ namespace AutoAlloApp
             }
 
             Console.WriteLine($"Avareage distance: {avereageDistance / buildings.Count} Biggest difference: {highest - lowest}");
+
+            Console.WriteLine($"SOMMER in U2: {reservations.Where(x => x.PriorityNumber == 3 && x.ParkingSpot.Contains("U2")).Count()}");
+            Console.WriteLine($"SOMMER in A-G: {reservations.Where(x => x.PriorityNumber == 3 && !x.ParkingSpot.Contains("U2")).Count()}");
+            Console.WriteLine($"SLT and RES in U2: {reservations.Where(x => x.PriorityNumber is 1 or 2 && x.ParkingSpot.Contains("U2")).Count()}");
+            Console.WriteLine($"SLT and RES in A-G: {reservations.Where(x => x.PriorityNumber is 1 or 2 && !x.ParkingSpot.Contains("U2")).Count()}");
         }
 
         private static void CreateHeatMap()
@@ -306,9 +313,9 @@ namespace AutoAlloApp
         /// </summary>
         /// <param name="building"></param>
         /// <returns></returns>
-        private static int NumberOfReservations(this Building building) {
+        private static int NumberOfReservations(this Building building, int[] includedPriorities) {
 
-            int newReservationsCount = reservations.Where(x => x.BuildingNumber == building.BuildingNumber && x.PriorityNumber is 1 or 2).Count();
+            int newReservationsCount = reservations.Where(x => x.BuildingNumber == building.BuildingNumber && includedPriorities.Contains(x.PriorityNumber)).Count();
             return newReservationsCount;
         }
 
