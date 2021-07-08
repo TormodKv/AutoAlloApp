@@ -12,6 +12,9 @@ namespace AutoAlloApp
         //Spots affiliated with this building. This is automatically sorted. best first
         public List<string> spots = new();
 
+        //temporarily hold the parking spots once.
+        public List<string> temp = new();
+
         public int neededNumberOfSpots;
         public string Name { get; set; }
 

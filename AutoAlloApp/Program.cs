@@ -21,7 +21,7 @@ namespace AutoAlloApp
         //The main grid of the parking garage
         public static string[,] matrix;
 
-        static List<Reservation> oldReservations;
+
         static List<Reservation> reservations;
         static List<Building> buildings;
 
@@ -31,7 +31,6 @@ namespace AutoAlloApp
         static void Main(string[] args)
         {
 
-            oldReservations = new();
             reservations = new();
             buildings = new();
             spots = new();
@@ -40,46 +39,78 @@ namespace AutoAlloApp
 
             FillMatrix();
 
-            FillOldReservations();
+            AddOldReservationsToReservationList();
 
+            UpdateBuildingsNumberOfSpots();
+
+            AssignSpotsToBuildings();
+
+            AssignSpotsToReservations();
+
+            PrintData();
+
+            CreateResultCSV();
+
+            //Optional. Just for visualization
+            CreateHeatMap();
+
+        }
+
+        private static void UpdateBuildingsNumberOfSpots()
+        {
             //Sets the number of reservations (with parking) per building
             foreach (Building building in buildings)
             {
                 building.neededNumberOfSpots = building.NumberOfReservations();
             }
+        }
 
+        private static void AssignSpotsToBuildings()
+        {
             //Combine buildings and spots
             while (buildings.Any(x => x.PercentageAllocated < 1))
             {
                 buildings.Where(x => x.PercentageAllocated < 1).OrderByDescending(x => x.Badness).First().AquireNearestSpot(spots);
             }
+        }
 
+        /// <summary>
+        /// Gives each reservation a spot. Cannot give more spots than there are in Building.spots lists.
+        /// </summary>
+        private static void AssignSpotsToReservations()
+        {
             //combine reservations and spots
             foreach (Reservation res in reservations)
             {
 
+                Building building = buildings.First(x => x.Name == res.Building);
+
+                if (building.spots.Count() == 0)
+                    continue;
+
                 if (res.ParkingSpot.Length > 0)
                 {
-                    buildings.First(x => x.Name == res.Building).spots.Remove(res.ParkingSpot);
-                    buildings.First(x => x.Name == res.Building).spots.Add(res.ParkingSpot);
-                    continue;
+                    //reservations already have parkingspot
+                    building.spots.Remove(res.ParkingSpot);
+                    building.temp.Add(res.ParkingSpot);
                 }
+                else
+                {
+                    //reservations do not have a parkingspot
+                    string bestSpot = building.spots.First();
 
-                string bestSpot = buildings.First(x => x.Name == res.Building).spots.First();
-                res.ParkingSpot = bestSpot;
-                buildings.First(x => x.Name == res.Building).spots.Remove(bestSpot);
-                buildings.First(x => x.Name == res.Building).spots.Add(bestSpot);
+                    res.ParkingSpot = bestSpot;
+                    building.spots.Remove(bestSpot);
+                    building.temp.Add(bestSpot);
+                }
 
             }
 
-            PrintData();
-
-
-            CreateFile();
-
-            //Optional. Just for visualization
-            CreateHeatMap();
-
+            //Add the spots back to the spot array
+            foreach (Building b in buildings)
+            {
+                b.spots.AddRange(b.temp);
+            }
         }
 
         private static void FillMatrix()
@@ -127,7 +158,7 @@ namespace AutoAlloApp
         /// <summary>
         /// Gives the already handed out parking spot to an old customer
         /// </summary>
-        private static void FillOldReservations()
+        private static void AddOldReservationsToReservationList()
         {
             if (!File.Exists(OLDEXPORTLOCATION)) {
                 return;
@@ -224,14 +255,14 @@ namespace AutoAlloApp
         /// <summary>
         /// Creates the final csv file for importing into HotelAdmin
         /// </summary>
-        private static void CreateFile()
+        private static void CreateResultCSV()
         {
             string[] lines = new string[reservations.Count + 1];
 
             lines[0] = "SpotNumber;Priority;PersonKey;RoomKey;ArrivalDate";
 
-            for (int i = 1; i < reservations.Count; i++) {
-                Reservation res = reservations[i];
+            for (int i = 1; i <= reservations.Count; i++) {
+                Reservation res = reservations[i-1];
                 lines[i] = res.ParkingSpot + ";" + res.PriorityNumber + ";" + res.PersonKey + ";" + res.RoomKey + ";" + res.ArrivalDate;
             }
 
@@ -277,9 +308,8 @@ namespace AutoAlloApp
         /// <returns></returns>
         private static int NumberOfReservations(this Building building) {
 
-            int newReservationsCount = reservations.Where(x => x.BuildingNumber == building.BuildingNumber).Count();
-            int oldReservationsCount = oldReservations.Where(x => x.BuildingNumber == building.BuildingNumber).Count();
-            return oldReservationsCount + newReservationsCount;
+            int newReservationsCount = reservations.Where(x => x.BuildingNumber == building.BuildingNumber && x.PriorityNumber is 1 or 2).Count();
+            return newReservationsCount;
         }
 
         /// <summary>
