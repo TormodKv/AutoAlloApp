@@ -12,13 +12,14 @@ namespace AutoAlloApp
         CustomOrder,
         CustomOrderSinglePercent,
         CustomOrderSinglePercentWithFirstAndBest,
-        CustomOrderFill_A_to_G_First
+        CustomOrderFill_A_to_G_First,
+        ManualDividing
     }
 
     static class Program
     {
         //Choose any of the alorhithms for different results.
-        private static AllocateAlgorithm allocationAlorithm = AllocateAlgorithm.CustomOrderSinglePercent;
+        public static AllocateAlgorithm allocationAlorithm = AllocateAlgorithm.ManualDividing;
 
         //Trial and error variables. Some work better than other. Run multiple test to find the best
         static int[] customOrder = new int[] { 1, 3, 5, 22, 24, 7, 18, 20, 16, 2, 10, 14 ,12, 4};
@@ -109,6 +110,22 @@ namespace AutoAlloApp
                 
                 switch (allocationAlorithm)
                 {
+                    case AllocateAlgorithm.ManualDividing:
+                        Building building0 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
+                        while (true)
+                        {
+                            if (!building0.AquireNearestSpot(spots))
+                                break;
+                        }
+                        customOrderIndex++;
+
+                        if (customOrderIndex >= customOrder.Length)
+                        {
+                            allocationAlorithm = AllocateAlgorithm.FirstAndBest;
+                        }
+
+                        break;
+
                     case AllocateAlgorithm.CustomOrder:
                         Building building1 = buildings.First(x => x.BuildingNumber == customOrder[customOrderIndex]);
                         while (building1.PercentageAllocated < 1)
