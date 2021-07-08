@@ -209,7 +209,7 @@ namespace AutoAlloApp
 
                 string[] splitLine = line.Split(";");
 
-                string arrival = splitLine[7].Split(" ")[0];
+                string arrival = splitLine[6].Split(" ")[0];
                 //swapping
                 string[] arrivalArray = arrival.Split(".");
                 string year = arrivalArray[2];
