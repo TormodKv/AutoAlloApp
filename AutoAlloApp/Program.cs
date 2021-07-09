@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text;
 
 namespace AutoAlloApp
 {
@@ -16,21 +17,32 @@ namespace AutoAlloApp
         private static string MAPLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Map.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string EXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Export.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string OLDEXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "OldExport.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
-        private static string RESULTLOCATION = AppDomain.CurrentDomain.BaseDirectory.Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
+        private static string ROOTLOCATION = AppDomain.CurrentDomain.BaseDirectory.Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
+
+        private static string EMPLOYEEIMPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "EmployeeImport.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
+        private static string FREESPOTSLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "FreeSpots.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
 
         //The main grid of the parking garage
         public static string[,] matrix;
 
-
         static List<Reservation> reservations;
         static List<Building> buildings;
 
+        //Used only to allocate employees. They need a building to use the pathfinding alorithm ):
+        static Building entrance;
+
         //Key: Spot name. Value: occupied
         static Dictionary<string, bool> spots;
-        
+
+        //Key: Spot name. Value: occupied. Spots that are never in use by 
+        static Dictionary<string, bool> employeeSpots;
+
+        static List<string> employeeList;
+
         static void Main(string[] args)
         {
-
+            employeeList = new();
+            employeeSpots = new();
             reservations = new();
             buildings = new();
             spots = new();
@@ -41,13 +53,18 @@ namespace AutoAlloApp
 
             AddOldReservationsToReservationList();
 
-            UpdateBuildingsNumberOfSpots(new int[] { 1 , 2 });
+            //Allocate spots for 1. and 2. prio
+            UpdateBuildingsNumberOfSpots(new int[] { 1, 2 });
             AssignSpotsToBuildings();
             AssignSpotsToReservations();
 
+            //Allocate spots for 3. prio
             UpdateBuildingsNumberOfSpots(new int[] { 1, 2, 3 });
             AssignSpotsToBuildings();
             AssignSpotsToReservations();
+
+
+            MakeEmplyeeParkingList();
 
             PrintData();
 
@@ -56,6 +73,56 @@ namespace AutoAlloApp
             //Optional. Just for visualization
             CreateHeatMap();
 
+        }
+
+        /// <summary>
+        /// Everything that has to do with employee parking. handeled seperatly
+        /// </summary>
+        private static void MakeEmplyeeParkingList()
+        {
+            FillEmployeeSpots();
+            FillEmployeeList();
+            entrance.neededNumberOfSpots = employeeSpots.Count();
+            while (entrance.PercentageAllocated < 1)
+            {
+                entrance.AquireNearestSpot(employeeSpots);
+            }
+
+            List<string> exportList = new();
+            for (int i = 0; i < Math.Min(entrance.spots.Count(), employeeList.Count()); i++)
+            {
+                exportList.Add($"{employeeList[i]} : {entrance.spots[i]}");
+            }
+
+            File.WriteAllLines(ROOTLOCATION + "EmployeeExport.csv", exportList, Encoding.UTF8);
+        }
+
+        private static void FillEmployeeSpots()
+        {
+            if(!File.Exists(FREESPOTSLOCATION)) {
+                return;
+            }
+
+            //Eventually replace this with a query to a database
+            string[] lines = File.ReadAllLines(FREESPOTSLOCATION);
+            foreach (string line in lines) {
+                employeeSpots.Add(line, false);
+            }
+        }
+
+        private static void FillEmployeeList()
+        {
+            if (!File.Exists(EMPLOYEEIMPORTLOCATION))
+            {
+                return;
+            }
+
+            //Eventually replace this with a query to a database
+            string[] lines = File.ReadAllLines(EMPLOYEEIMPORTLOCATION);
+            foreach (string line in lines)
+            {
+                employeeList.Add(line);
+            }
         }
 
         private static void UpdateBuildingsNumberOfSpots(int[] includedPriorities)
@@ -144,15 +211,17 @@ namespace AutoAlloApp
                     //Cell is a comment
                     if (cell.Contains("#"))
                         continue;
-
+                    
                     //Cell i a building
                     if (cell.IsBuilding())
                         buildings.Add(new Building(cell, new Point(x, y)));
-
+                    
                     //Cell is a normal parking spot
                     else if (cell.IsSpot())
                         spots.Add(cell, false);
-
+                    
+                    else if (cell.Equals("Enter"))
+                        entrance = new Building("X 25", new Point(x, y));
                 }
             }
         }
@@ -256,7 +325,7 @@ namespace AutoAlloApp
                 lines[y] = String.Join(";", splitLine);
             }
 
-            File.WriteAllLines(RESULTLOCATION + "HeatMap.csv", lines);
+            File.WriteAllLines(ROOTLOCATION + "HeatMap.csv", lines, Encoding.UTF8);
         }
 
         /// <summary>
@@ -273,7 +342,7 @@ namespace AutoAlloApp
                 lines[i] = res.ParkingSpot + ";" + res.PriorityNumber + ";" + res.PersonKey + ";" + res.RoomKey + ";" + res.ArrivalDate;
             }
 
-            File.WriteAllLines(RESULTLOCATION + "Result.csv", lines);
+            File.WriteAllLines(ROOTLOCATION + "Result.csv", lines, Encoding.UTF8);
         }
 
         /// <summary>
