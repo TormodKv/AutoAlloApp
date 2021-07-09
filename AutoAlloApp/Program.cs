@@ -64,13 +64,14 @@ namespace AutoAlloApp
             AssignSpotsToReservations();
 
 
-            MakeEmplyeeParkingList();
+            //Not neccessary in production
+            MakeEmployeeParkingList();
 
             PrintData();
 
             CreateResultCSV();
 
-            //Optional. Just for visualization
+            //Not neccessary in production
             CreateHeatMap();
 
         }
@@ -78,10 +79,11 @@ namespace AutoAlloApp
         /// <summary>
         /// Everything that has to do with employee parking. handeled seperatly
         /// </summary>
-        private static void MakeEmplyeeParkingList()
+        private static void MakeEmployeeParkingList()
         {
             FillEmployeeSpots();
             FillEmployeeList();
+            UpdateFreeSpots();
             entrance.neededNumberOfSpots = employeeSpots.Count();
             while (entrance.PercentageAllocated < 1)
             {
@@ -108,6 +110,29 @@ namespace AutoAlloApp
             foreach (string line in lines) {
                 employeeSpots.Add(line, false);
             }
+        }
+
+        private static void UpdateFreeSpots()
+        {
+            if (!File.Exists(FREESPOTSLOCATION))
+            {
+                return;
+            }
+
+            List<string> temp = new();
+
+            string[] lines = File.ReadAllLines(FREESPOTSLOCATION);
+            foreach (string line in lines)
+            {
+                if (!line.IsSpot())
+                    continue;
+
+                if (spots.ContainsKey(line) && spots[line] == false) {
+                    temp.Add(line);
+                }
+            }
+
+            File.WriteAllLines(FREESPOTSLOCATION, temp, Encoding.UTF8);
         }
 
         private static void FillEmployeeList()
@@ -247,6 +272,15 @@ namespace AutoAlloApp
                 // We are working with literal "NULL" instead of "" for null values.
 
                 string[] splitLine = line.Split(";");
+
+                string[] departureArray = splitLine[7].Split(" ")[0].Split(".");
+
+                DateTime reservationDeparture = new DateTime(Int32.Parse(departureArray[2]), Int32.Parse(departureArray[1]), Int32.Parse(departureArray[0]));
+
+                //This reservation is old, and will not take up a parking spot.
+                //Meaning the guest has left. and there's no reason 
+                if (DateTime.Now > reservationDeparture)
+                    continue;
 
                 string arrival = splitLine[6].Split(" ")[0];
                 //swapping
