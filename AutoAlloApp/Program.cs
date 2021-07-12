@@ -443,7 +443,21 @@ namespace AutoAlloApp
                 if (splitLine[3] == "NULL" || splitLine[3] == "")
                     continue;
 
-                reservations.Add(new Reservation(splitLine[2], splitLine[5], splitLine[3], splitLine[4], splitLine[0], splitLine[1]));
+                Reservation res = new Reservation(splitLine[2], splitLine[5], splitLine[3], splitLine[4], splitLine[0], splitLine[1]);
+
+                //If the personkey already list: prioritize the one with the highest contract type.
+                if (reservations.Any(x => x.PersonKey == res.PersonKey))
+                {
+                    if (reservations.First(x => x.PersonKey == res.PersonKey).PriorityNumber > res.PriorityNumber)
+                    {
+                        reservations.Remove(reservations.First(x => x.PersonKey == res.PersonKey));
+                    }
+                    else {
+                        continue;
+                    }
+                }
+
+                reservations.Add(res);
             }
 
             //how the reservations should be ordered.
