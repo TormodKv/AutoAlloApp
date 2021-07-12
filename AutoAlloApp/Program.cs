@@ -299,7 +299,7 @@ namespace AutoAlloApp
 
                 string[] splitLine = line.Split(";");
 
-                string[] departureArray = splitLine[7].Split(" ")[0].Split(".");
+                string[] departureArray = splitLine[8].Split(" ")[0].Split(".");
 
                 DateTime reservationDeparture = new DateTime(Int32.Parse(departureArray[2]), Int32.Parse(departureArray[1]), Int32.Parse(departureArray[0]));
 
@@ -308,15 +308,14 @@ namespace AutoAlloApp
                 if (DateTime.Now > reservationDeparture)
                     continue;
 
-                string arrival = splitLine[6].Split(" ")[0];
-                //swapping
+                //Extracting arival date
+                string arrival = splitLine[7].Split(" ")[0];
                 string[] arrivalArray = arrival.Split(".");
                 string year = arrivalArray[2];
                 string month = arrivalArray[1];
                 string day = arrivalArray[0];
-
                 arrival = $"{year}-{month}-{day}";
-            
+
 
                 string parkingSpot = splitLine[0];
 
@@ -326,10 +325,8 @@ namespace AutoAlloApp
 
                 buildings.First(x => x.Name == mirrorReservation.Building).spots.Add(parkingSpot);
 
-                foreach (string spot in buildings.First(x => x.Name == mirrorReservation.Building).spots) {
-                    spots[spot] = true;
-                }
-
+                spots[parkingSpot] = true;
+                
             }
         }
 
