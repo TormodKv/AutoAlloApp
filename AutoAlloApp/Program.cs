@@ -47,6 +47,8 @@ namespace AutoAlloApp
             buildings = new();
             spots = new();
 
+            RemoveDuplicatesFromExport();
+
             FillReservations();
 
             FillMatrix();
@@ -74,6 +76,30 @@ namespace AutoAlloApp
             //Not neccessary in production
             CreateHeatMap();
 
+        }
+
+        /// <summary>
+        /// Removes all duplicate personkeys with the same date from export list. only keeps the best contracts
+        /// </summary>
+        private static void RemoveDuplicatesFromExport()
+        {
+            string[] lines = File.ReadAllLines(EXPORTLOCATION);
+            List<string> newLines = new();
+            List<(string , string)> personKeys = new();
+            foreach (string line in lines)
+            {
+                if (personKeys.Contains((line.Split(";")[2], line.Split(";")[0])))
+                {
+                    continue;
+                }
+                else
+                {
+                    personKeys.Add((line.Split(";")[2], line.Split(";")[0]));
+                    newLines.Add(line);
+                }
+            }
+
+            File.WriteAllLines(EXPORTLOCATION, newLines, Encoding.UTF8);
         }
 
         /// <summary>
@@ -343,15 +369,17 @@ namespace AutoAlloApp
                 {
                     string cell = splitLine[x].Trim();
 
-                    if (cell.IsSpot() && spots.ContainsKey(cell)) {
+                    if (cell.IsSpot() && spots.ContainsKey(cell))
+                    {
 
                         //This query is kinda time consuming
-                        Building? building = buildings.FirstOrDefault(x => x.spots.Contains(cell));
+                        Reservation? res = reservations.FirstOrDefault(x => x.ParkingSpot == cell);
 
-                        if (building != null) { 
-                            splitLine[x] = cell + " Z " + building.BuildingNumber.ToString();
+                        if (res != null)
+                        {
+                            splitLine[x] = cell + " Z " + res.BuildingNumber.ToString();
                         }
-                        
+
                     }
 
                 }
