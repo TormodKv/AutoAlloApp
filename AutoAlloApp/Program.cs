@@ -14,13 +14,11 @@ namespace AutoAlloApp
         public static float scale = 1.5f;
 
         //File locations
+        private static string EXCLUDEDSPOTSLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Excluded.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string MAPLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Map.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string EXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Export.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string OLDEXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "OldExport.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string ROOTLOCATION = AppDomain.CurrentDomain.BaseDirectory.Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
-
-        private static string EMPLOYEEIMPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "EmployeeImport.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
-        private static string FREESPOTSLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "FreeSpots.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
 
         //The main grid of the parking garage
         public static string[,] matrix;
@@ -53,8 +51,6 @@ namespace AutoAlloApp
 
             FillMatrix();
 
-            AddOldReservationsToReservationList();
-
             //Allocate spots for 1. and 2. prio
             UpdateBuildingsNumberOfSpots(new int[] { 1, 2 });
             AssignSpotsToBuildings();
@@ -64,10 +60,6 @@ namespace AutoAlloApp
             UpdateBuildingsNumberOfSpots(new int[] { 1, 2, 3 });
             AssignSpotsToBuildings();
             AssignSpotsToReservations();
-
-
-            //Not neccessary in production
-            MakeEmployeeParkingList();
 
             PrintData();
 
@@ -85,7 +77,7 @@ namespace AutoAlloApp
         {
             string[] lines = File.ReadAllLines(EXPORTLOCATION);
             List<string> newLines = new();
-            List<(string , string)> personKeys = new();
+            List<(string, string)> personKeys = new();
             foreach (string line in lines)
             {
                 if (personKeys.Contains((line.Split(";")[2], line.Split(";")[0])))
@@ -100,80 +92,6 @@ namespace AutoAlloApp
             }
 
             File.WriteAllLines(EXPORTLOCATION, newLines, Encoding.UTF8);
-        }
-
-        /// <summary>
-        /// Everything that has to do with employee parking. handeled seperatly
-        /// </summary>
-        private static void MakeEmployeeParkingList()
-        {
-            FillEmployeeSpots();
-            FillEmployeeList();
-            UpdateFreeSpots();
-            entrance.neededNumberOfSpots = employeeSpots.Count();
-            while (entrance.PercentageAllocated < 1)
-            {
-                entrance.AquireNearestSpot(employeeSpots);
-            }
-
-            List<string> exportList = new();
-            for (int i = 0; i < Math.Min(entrance.spots.Count(), employeeList.Count()); i++)
-            {
-                exportList.Add($"{employeeList[i]} : {entrance.spots[i]}");
-            }
-
-            File.WriteAllLines(ROOTLOCATION + "EmployeeExport.csv", exportList, Encoding.UTF8);
-        }
-
-        private static void FillEmployeeSpots()
-        {
-            if(!File.Exists(FREESPOTSLOCATION)) {
-                return;
-            }
-
-            //Eventually replace this with a query to a database
-            string[] lines = File.ReadAllLines(FREESPOTSLOCATION);
-            foreach (string line in lines) {
-                employeeSpots.Add(line, false);
-            }
-        }
-
-        private static void UpdateFreeSpots()
-        {
-            if (!File.Exists(FREESPOTSLOCATION))
-            {
-                return;
-            }
-
-            List<string> temp = new();
-
-            string[] lines = File.ReadAllLines(FREESPOTSLOCATION);
-            foreach (string line in lines)
-            {
-                if (!line.IsSpot())
-                    continue;
-
-                if (spots.ContainsKey(line) && spots[line] == false) {
-                    temp.Add(line);
-                }
-            }
-
-            File.WriteAllLines(FREESPOTSLOCATION, temp, Encoding.UTF8);
-        }
-
-        private static void FillEmployeeList()
-        {
-            if (!File.Exists(EMPLOYEEIMPORTLOCATION))
-            {
-                return;
-            }
-
-            //Eventually replace this with a query to a database
-            string[] lines = File.ReadAllLines(EMPLOYEEIMPORTLOCATION);
-            foreach (string line in lines)
-            {
-                employeeList.Add(line);
-            }
         }
 
         private static void UpdateBuildingsNumberOfSpots(int[] includedPriorities)
@@ -268,7 +186,7 @@ namespace AutoAlloApp
                         buildings.Add(new Building(cell, new Point(x, y)));
                     
                     //Cell is a normal parking spot
-                    else if (cell.IsSpot())
+                    else if (cell.IsSpot() && !cell.IsExcluded())
                         spots.Add(cell, false);
                     
                     else if (cell.Equals("Enter"))
@@ -277,57 +195,9 @@ namespace AutoAlloApp
             }
         }
 
-        /// <summary>
-        /// Gives the already handed out parking spot to an old customer
-        /// </summary>
-        private static void AddOldReservationsToReservationList()
-        {
-            if (!File.Exists(OLDEXPORTLOCATION)) {
-                return;
-            }
-
-            //Eventually replace this with a query to a database
-            string[] lines = File.ReadAllLines(OLDEXPORTLOCATION);
-
-            foreach (string line in lines)
-            {
-
-                //Headers is as following:
-                //Parking Spot Number, Customer, Cell Phone, Email, Person Key, Room Key, Contract Type, Arrival Date, Departure Date, Status
-
-                // We are working with literal "NULL" instead of "" for null values.
-
-                string[] splitLine = line.Split(";");
-
-                string[] departureArray = splitLine[8].Split(" ")[0].Split(".");
-
-                DateTime reservationDeparture = new DateTime(Int32.Parse(departureArray[2]), Int32.Parse(departureArray[1]), Int32.Parse(departureArray[0]));
-
-                //This reservation is old, and will not take up a parking spot.
-                //Meaning the guest has left. and there's no reason 
-                if (DateTime.Now > reservationDeparture)
-                    continue;
-
-                //Extracting arival date
-                string arrival = splitLine[7].Split(" ")[0];
-                string[] arrivalArray = arrival.Split(".");
-                string year = arrivalArray[2];
-                string month = arrivalArray[1];
-                string day = arrivalArray[0];
-                arrival = $"{year}-{month}-{day}";
-
-
-                string parkingSpot = splitLine[0];
-
-                Reservation mirrorReservation = reservations.FirstOrDefault(x => x.PersonKey == splitLine[4] && x.RoomKey == splitLine[5] && arrival == x.ArrivalDate);
-
-                mirrorReservation.ParkingSpot = parkingSpot;
-
-                buildings.First(x => x.Name == mirrorReservation.Building).spots.Add(parkingSpot);
-
-                spots[parkingSpot] = true;
-                
-            }
+        private static bool IsExcluded(this string cell) {
+            string[] lines = File.ReadAllLines(EXCLUDEDSPOTSLOCATION);
+            return lines.Contains(cell);
         }
 
         private static void PrintData()
