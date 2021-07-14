@@ -45,9 +45,9 @@ namespace AutoAlloApp
             buildings = new();
             spots = new();
 
-            RemoveDuplicatesFromExport();
+            List<string> lines = RemoveDuplicatesFromExport();
 
-            FillReservations();
+            FillReservations(lines);
 
             FillMatrix();
 
@@ -73,25 +73,26 @@ namespace AutoAlloApp
         /// <summary>
         /// Removes all duplicate personkeys with the same date from export list. only keeps the best contracts
         /// </summary>
-        private static void RemoveDuplicatesFromExport()
+        private static List<string> RemoveDuplicatesFromExport()
         {
             string[] lines = File.ReadAllLines(EXPORTLOCATION);
-            List<string> newLines = new();
-            List<(string, string)> personKeys = new();
-            foreach (string line in lines)
-            {
-                if (personKeys.Contains((line.Split(";")[2], line.Split(";")[0])))
+            List<string> newLines = lines.ToList();
+            List<string> newLinesCopy = lines.ToList();
+            List<string> personKeys = new();
+
+            newLinesCopy = newLinesCopy.OrderBy(x => Int32.Parse(x.Split(";")[0].Replace("-",""))).ToList();
+
+            foreach (string line in newLinesCopy) {
+                if (personKeys.Contains(line.Split(";")[2]))
                 {
-                    continue;
+                    newLines.Remove(line);
                 }
-                else
-                {
-                    personKeys.Add((line.Split(";")[2], line.Split(";")[0]));
-                    newLines.Add(line);
+                else 
+                { 
+                    personKeys.Add(line.Split(";")[2]);
                 }
             }
-
-            File.WriteAllLines(EXPORTLOCATION, newLines, Encoding.UTF8);
+            return newLines;
         }
 
         private static void UpdateBuildingsNumberOfSpots(int[] includedPriorities)
@@ -320,11 +321,8 @@ namespace AutoAlloApp
         /// <summary>
         /// Fills up the reservation list with reservation export from database
         /// </summary>
-        private static void FillReservations()
+        private static void FillReservations(List<string> lines)
         {
-            //Eventually replace this with a query to a database
-            string[] lines = File.ReadAllLines(EXPORTLOCATION);
-
             foreach (string line in lines) {
 
                 //Headers is as following:
