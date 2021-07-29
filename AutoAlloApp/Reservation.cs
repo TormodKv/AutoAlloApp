@@ -8,6 +8,8 @@ namespace AutoAlloApp
 {
     class Reservation
     {
+        public string ReservationID { get; set; }
+
         private string parkingSpot = "";
         public string ParkingSpot {
             set => parkingSpot = value;
@@ -91,7 +93,7 @@ namespace AutoAlloApp
             }
         }
 
-        public Reservation(string personKey, string parkingAgreementCode, string roomKey, string contractType, string ArrivalDate, string DepartureDate) {
+        public Reservation(string personKey, string parkingAgreementCode, string roomKey, string contractType, string ArrivalDate, string DepartureDate, string ReservationID) {
 
             this.PersonKey = personKey;
             this.ParkingAgreementCode = parkingAgreementCode;
@@ -99,7 +101,7 @@ namespace AutoAlloApp
             this.ContractType = contractType;
             this.ArrivalDate = ArrivalDate;
             this.DepartureDate = DepartureDate;
-
+            this.ReservationID = ReservationID;
         }
     }
 }

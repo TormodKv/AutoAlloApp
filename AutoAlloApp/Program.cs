@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlClient;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -10,14 +12,18 @@ namespace AutoAlloApp
 
     static class Program
     {
-
+        //Don't ask
         public static float scale = 1.5f;
 
+        private static string ReservationDatabaseConnection = "Database Connection Here";
+        private static string ParkingAllocationDatabaseConnection = "Database Connection Here";
+
         //File locations
-        private static string EXCLUDEDSPOTSLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Excluded.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
+        private static string EXCLUDEDSPOTSSQL = (AppDomain.CurrentDomain.BaseDirectory + "ExcludedSpots.sql").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
+        private static string EXCLUDEDSPOTSCSV = (AppDomain.CurrentDomain.BaseDirectory + "ExcludedSpots.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
+        private static string EXCLUDEDPERSONSCSV = (AppDomain.CurrentDomain.BaseDirectory + "ExcludedPersons.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string MAPLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Map.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
-        private static string EXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "Export.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
-        private static string OLDEXPORTLOCATION = (AppDomain.CurrentDomain.BaseDirectory + "OldExport.csv").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
+        private static string EXPORTSQL = (AppDomain.CurrentDomain.BaseDirectory + "ConRes.sql").Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
         private static string ROOTLOCATION = AppDomain.CurrentDomain.BaseDirectory.Replace("AutoAlloApp\\bin\\Debug\\net5.0\\", "");
 
         //The main grid of the parking garage
@@ -26,73 +32,177 @@ namespace AutoAlloApp
         static List<Reservation> reservations;
         static List<Building> buildings;
 
-        //Used only to allocate employees. They need a building to use the pathfinding alorithm ):
-        static Building entrance;
-
         //Key: Spot name. Value: occupied
         static Dictionary<string, bool> spots;
 
-        //Key: Spot name. Value: occupied. Spots that are never in use by 
-        static Dictionary<string, bool> employeeSpots;
+        static List<string> excludedSpotsListSQL;
 
-        static List<string> employeeList;
+        static List<string> excludedSpotsListCSV;
+
+        static List<string> excludedPersonsListCSV;
 
         static void Main(string[] args)
         {
-            employeeList = new();
-            employeeSpots = new();
+
             reservations = new();
             buildings = new();
             spots = new();
 
-            List<string> lines = RemoveDuplicatesFromExport();
+            try
+            {
+                excludedPersonsListCSV = File.ReadAllLines(EXCLUDEDPERSONSCSV).ToList<string>();
+            }
+            catch (FileNotFoundException) {
+                excludedPersonsListCSV = new();
+            }
 
-            FillReservations(lines);
+            try
+            {
+                excludedSpotsListSQL = GetDataFromDatebase(EXCLUDEDSPOTSSQL, ParkingAllocationDatabaseConnection);
+            }
+            catch (FileNotFoundException)
+            {
+                excludedSpotsListSQL = new();
+            }
+
+            try
+            {
+                excludedSpotsListCSV = File.ReadAllLines(EXCLUDEDSPOTSCSV).ToList<string>();
+            }
+            catch (FileNotFoundException) {
+                excludedSpotsListCSV = new();
+            }
+
+            List<string> rawReservations = RemoveDuplicatesFromExport(GetDataFromDatebase(EXPORTSQL, ReservationDatabaseConnection));
+
+            FillReservations(rawReservations);
 
             FillMatrix();
 
-            //Allocate spots for 1. and 2. prio
+            //Allocate spots for 1. prio
+            UpdateBuildingsNumberOfSpots(new int[] { 1 });
+            AssignSpotsToBuildings();
+
+            //Allocate spots for 2. prio
             UpdateBuildingsNumberOfSpots(new int[] { 1, 2 });
             AssignSpotsToBuildings();
-            AssignSpotsToReservations();
 
             //Allocate spots for 3. prio
             UpdateBuildingsNumberOfSpots(new int[] { 1, 2, 3 });
             AssignSpotsToBuildings();
+
             AssignSpotsToReservations();
 
-            PrintData();
+            //Not neccessary
+            PrintStatistics();
 
             CreateResultCSV();
 
-            //Not neccessary in production
+            //Not neccessary
             CreateHeatMap();
 
         }
 
         /// <summary>
+        /// Returns an emulated CSV file from the database.
+        /// </summary>
+        /// <param name="sqlLocation"></param>
+        /// <returns></returns>
+        private static List<string> GetDataFromDatebase(string sqlLocation, string sqlConnection)
+        {
+            List<string> content = new();
+
+            //Create querystring from sql file
+            string queryString = "";
+            string[] lines = File.ReadAllLines(sqlLocation);
+            foreach (string line in lines) {
+                queryString += " " + line;
+            }
+
+
+            using (SqlConnection connection = new SqlConnection(sqlConnection))
+            {
+                SqlCommand command = new SqlCommand(queryString, connection);
+                connection.Open();
+                SqlDataReader reader = command.ExecuteReader();
+                try
+                {
+                    while (reader.Read())
+                    {
+                        string row = ReadSingleRow((IDataRecord)reader);
+
+                        bool excluded = false;
+                        foreach (string personKey in excludedPersonsListCSV) {
+                            if (row.Contains(personKey)) 
+                            {
+                                excluded = true;
+                                break;
+                            }
+                        }
+
+                        if (!excluded)
+                            content.Add(row);
+                    }
+                }
+                finally
+                {
+                    reader.Close();
+                }
+            }
+
+            return content;
+        }
+
+        private static string ReadSingleRow(IDataRecord record)
+        {
+ 
+            string cell = "";
+            for (int i = 0; i <= 6; i++) {
+
+                //This try catch is very inneffective, but it works
+                try
+                {
+                    //If cell is a date. Convert it from (dd.mm.yyyy hh:mm:ss) to (yyyy-mm-dd)
+                    if (record[i].ToString().Contains(" 00:00:00"))
+                    {
+                        string[] date = record[i].ToString().Replace(" 00:00:00", "").Split(".");
+                        cell += $"{date[2]}-{date[1]}-{date[0]};";
+                    }
+                    else { 
+                        cell += record[i] + ";";
+                    }
+
+                }
+                catch {
+                    break;
+                }
+            }
+
+            //Remove last semicolon
+            return cell.Remove(cell.Length - 1);
+        }
+
+        /// <summary>
         /// Removes all duplicate personkeys with the same date from export list. only keeps the best contracts
         /// </summary>
-        private static List<string> RemoveDuplicatesFromExport()
+        private static List<string> RemoveDuplicatesFromExport(List<string> lines)
         {
-            string[] lines = File.ReadAllLines(EXPORTLOCATION);
-            List<string> newLines = lines.ToList();
-            List<string> newLinesCopy = lines.ToList();
+            List<string> Copy = lines.ToList();
             List<string> personKeys = new();
 
-            newLinesCopy = newLinesCopy.OrderBy(x => Int32.Parse(x.Split(";")[0].Replace("-",""))).ToList();
+            Copy = Copy.OrderBy(x => Int32.Parse(x.Split(";")[0].Replace("-",""))).ToList();
 
-            foreach (string line in newLinesCopy) {
+            foreach (string line in Copy) {
                 if (personKeys.Contains(line.Split(";")[2]))
                 {
-                    newLines.Remove(line);
+                    lines.Remove(line);
                 }
                 else 
                 { 
                     personKeys.Add(line.Split(";")[2]);
                 }
             }
-            return newLines;
+            return lines;
         }
 
         private static void UpdateBuildingsNumberOfSpots(int[] includedPriorities)
@@ -149,6 +259,7 @@ namespace AutoAlloApp
             foreach (Building b in buildings)
             {
                 b.spots.AddRange(b.temp);
+                b.temp.Clear();
             }
         }
 
@@ -185,41 +296,36 @@ namespace AutoAlloApp
                     //Cell i a building
                     if (cell.IsBuilding())
                         buildings.Add(new Building(cell, new Point(x, y)));
-                    
+
                     //Cell is a normal parking spot
                     else if (cell.IsSpot() && !cell.IsExcluded())
                         spots.Add(cell, false);
-                    
-                    else if (cell.Equals("Enter"))
-                        entrance = new Building("X 25", new Point(x, y));
                 }
             }
         }
 
         private static bool IsExcluded(this string cell) {
-            string[] lines = File.ReadAllLines(EXCLUDEDSPOTSLOCATION);
-            return lines.Contains(cell);
+
+            //remove this clearing if you want to take into consideration old parkingspots 
+            // and don't want to override old spots
+            excludedSpotsListSQL.Clear();
+
+            return excludedSpotsListSQL.Contains(cell) || excludedSpotsListCSV.Contains(cell);
         }
 
-        private static void PrintData()
+        private static void PrintStatistics()
         {
-            float avereageDistance = 0;
-            float highest = 0;
-            float lowest = 9999;
 
-            foreach (Building b in buildings) {
-                float thisAvg = b.AvgWalkDistance;
-                highest = highest > thisAvg ? highest : thisAvg;
-                lowest = lowest < thisAvg ? lowest : thisAvg;
-                avereageDistance += thisAvg;
-            }
+            Console.WriteLine($"Total Avareage distance: {buildings.Sum(x => x.AvgWalkDistance) / buildings.Count} Biggest difference: {buildings.OrderBy(x => x.AvgWalkDistance).Last().AvgWalkDistance - buildings.OrderBy(x => x.AvgWalkDistance).First().AvgWalkDistance}");
 
-            Console.WriteLine($"Avareage distance: {avereageDistance / buildings.Count} Biggest difference: {highest - lowest}");
-
+            Console.WriteLine($"Total in U2: {reservations.Where(x => x.ParkingSpot.Contains("U2")).Count()}");
+            Console.WriteLine($"Total in A-G: {reservations.Where(x => !x.ParkingSpot.Contains("U2")).Count()}");
             Console.WriteLine($"SOMMER in U2: {reservations.Where(x => x.PriorityNumber == 3 && x.ParkingSpot.Contains("U2")).Count()}");
             Console.WriteLine($"SOMMER in A-G: {reservations.Where(x => x.PriorityNumber == 3 && !x.ParkingSpot.Contains("U2")).Count()}");
-            Console.WriteLine($"SLT and RES in U2: {reservations.Where(x => x.PriorityNumber is 1 or 2 && x.ParkingSpot.Contains("U2")).Count()}");
-            Console.WriteLine($"SLT and RES in A-G: {reservations.Where(x => x.PriorityNumber is 1 or 2 && !x.ParkingSpot.Contains("U2")).Count()}");
+            Console.WriteLine($"SLT in U2: {reservations.Where(x => x.PriorityNumber == 2 && x.ParkingSpot.Contains("U2")).Count()}");
+            Console.WriteLine($"SLT in A-G: {reservations.Where(x => x.PriorityNumber == 2 && !x.ParkingSpot.Contains("U2")).Count()}");
+            Console.WriteLine($"RES in U2: {reservations.Where(x => x.PriorityNumber == 1 && x.ParkingSpot.Contains("U2")).Count()}");
+            Console.WriteLine($"RES in A-G: {reservations.Where(x => x.PriorityNumber == 1 && !x.ParkingSpot.Contains("U2")).Count()}");
         }
 
         private static void CreateHeatMap()
@@ -314,8 +420,8 @@ namespace AutoAlloApp
         /// <returns></returns>
         private static int NumberOfReservations(this Building building, int[] includedPriorities) {
 
-            int newReservationsCount = reservations.Where(x => x.BuildingNumber == building.BuildingNumber && includedPriorities.Contains(x.PriorityNumber)).Count();
-            return newReservationsCount;
+            int reservationsCount = reservations.Where(x => x.BuildingNumber == building.BuildingNumber && includedPriorities.Contains(x.PriorityNumber)).Count();
+            return reservationsCount;
         }
 
         /// <summary>
@@ -326,17 +432,11 @@ namespace AutoAlloApp
             foreach (string line in lines) {
 
                 //Headers is as following:
-                //DateArrival [0], DateDeparture [1], ContactExternalId [2], RoomKey [3], ContractType [4], ParkingAgreementCode[5]
-
-                // We are working with literal "NULL" instead of "" for null values.
+                //DateArrival [0], DateDeparture [1], ContactExternalId [2], RoomKey [3], ContractType [4], ParkingAgreementCode[5], ReservationID[6]
 
                 string[] splitLine = line.Split(";");
 
-                //If roomkey doesn't exist. Skip to the next
-                if (splitLine[3] == "NULL" || splitLine[3] == "")
-                    continue;
-
-                Reservation res = new Reservation(splitLine[2], splitLine[5], splitLine[3], splitLine[4], splitLine[0], splitLine[1]);
+                Reservation res = new Reservation(splitLine[2], splitLine[5], splitLine[3], splitLine[4], splitLine[0], splitLine[1], splitLine[6]);
 
                 //If the personkey already list: prioritize the one with the highest contract type.
                 if (reservations.Any(x => x.PersonKey == res.PersonKey))
